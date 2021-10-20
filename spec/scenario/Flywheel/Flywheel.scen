@@ -1,0 +1,221 @@
+-- NewComptroller, but with markets listed so that we can make them atlantis markets in constructor
+Macro FlywheelComptroller price=1.0 borrowRate=0.000005 atlantisInitAmount=5000000e18
+    Unitroller Deploy
+    PriceOracle Deploy Fixed price
+    PriceOracleProxy Deploy Admin (PriceOracle Address) (Address Zero) (Address Zero) (Address Zero) (Address Zero) (Address Zero)
+    ----g2
+    ComptrollerImpl Deploy ScenarioG2 ComptrollerScenG2
+    Unitroller SetPendingImpl ComptrollerScenG2
+    ComptrollerImpl ComptrollerScenG2 BecomeG2
+    --list some tokens
+    Comptroller SetPriceOracle (PriceOracleProxy Address)
+    Comptroller SetMaxAssets 20
+    Comptroller SetCloseFactor 0.5
+    Comptroller LiquidationIncentive 1.1
+    NewAToken ZRX aZRX
+    NewAToken BAT aBAT
+    Support aZRX collateralFactor:0.5
+    Support aBAT collateralFactor:0.5
+    -- final
+    ComptrollerImpl Deploy ScenarioG3 ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen BecomeG3 1e18 [aZRX aBAT]
+    Bep20 Deploy Standard Atlantis "Atlantis Token" 18
+    Give (Address Comptroller) atlantisInitAmount Atlantis
+    Comptroller Send "setAtlantisAddress(address)" (Address Atlantis)
+
+Macro InitSpeeds
+    Prep Geoff 100e18 ZRX aZRX
+    Mint Geoff 50e18 aZRX--tokenbalance = 50e18 / 2e9 = 2.5e10
+    Prep Coburn Some BAT aBAT
+    Mint Coburn 6e18 aBAT--tokenbalance = 6e18 / 2e9 = 3e9
+    EnterMarkets Coburn aBAT
+    Borrow Coburn 1e18 aZRX
+    Comptroller RefreshAtlantisSpeeds
+
+Test "Accrue Atlantis during a mint"
+    FlywheelComptroller
+    InitSpeeds
+    FastForward 300000 Blocks
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Mint Geoff 1e18 aZRX
+    -- new index = initVal + deltaBlocks * supplySpeed * 1e36 / totalSupply
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 2.5e10 = 1.2000000000001e49
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Assert Equal (Comptroller AtlantisSupplyState aZRX "index") 1.2000000000001e49
+    Assert Equal (Comptroller AtlantisSupplyState aZRX "block") 300000
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 300000e18
+    Assert Equal (Comptroller AtlantisSupplierIndex aZRX Geoff) 1.2000000000001e49
+
+Test "Accrue Atlantis during a borrow"
+    FlywheelComptroller
+    InitSpeeds
+    Comptroller FastForward 300000 Blocks
+    Assert Equal (Comptroller AtlantisAccrued Coburn) 0
+    Borrow Coburn 0.1e18 aZRX
+    -- new index = initVal + deltaBlocks * borrowSpeed * 1e36 / totalBorrows
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 1e18 =  3.00001e41
+    Assert Equal (Comptroller AtlantisAccrued Coburn) 0
+    Assert Equal (Comptroller AtlantisBorrowState aZRX "index") 3.00001e41
+    Assert Equal (Comptroller AtlantisBorrowState aZRX "block") 300000
+    Assert Equal (Bep20 Atlantis TokenBalance Coburn) 300000e18
+    Assert Equal (Comptroller AtlantisBorrowerIndex aZRX Coburn) 3.00001e41
+
+Test "Accrue Atlantis during a redeem"
+    FlywheelComptroller
+    InitSpeeds
+    FastForward 300000 Blocks
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Redeem Geoff 1e9 aZRX
+    -- new index = initVal + deltaBlocks * supplySpeed * 1e36 / totalSupply
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 2.5e10 = 1.2000000000001e49
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Assert Equal (Comptroller AtlantisSupplyState aZRX "index") 1.2000000000001e49
+    Assert Equal (Comptroller AtlantisSupplyState aZRX "block") 300000
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 300000e18
+    Assert Equal (Comptroller AtlantisSupplierIndex aZRX Geoff) 1.2000000000001e49
+
+Test "Accrue Atlantis during a repayBorrow"
+    FlywheelComptroller
+    InitSpeeds
+    FastForward 300000 Blocks
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Prep Coburn 0.5e18 ZRX aZRX
+    RepayBorrow Coburn 0.5e18 aZRX
+    -- new index = initVal + deltaBlocks * borrowSpeed * 1e36 / totalBorrows
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 1e18 =  3.00001e41
+    Assert Equal (Comptroller AtlantisAccrued Coburn) 0
+    Assert Equal (Comptroller AtlantisBorrowState aZRX "index") 3.00001e41
+    Assert Equal (Comptroller AtlantisBorrowState aZRX "block") 300000
+    Assert Equal (Bep20 Atlantis TokenBalance Coburn) 300000e18
+    Assert Equal (Comptroller AtlantisBorrowerIndex aZRX Coburn) 3.00001e41
+
+Test "Accrue Atlantis during a repayBorrowBehalf of 0"
+    FlywheelComptroller
+    InitSpeeds
+    FastForward 300000 Blocks
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    -- confirm we can init all flywheel accounts for free
+    RepayBorrowBehalf Jared Coburn 0 aZRX
+    -- new index = initVal + deltaBlocks * borrowSpeed * 1e36 / totalBorrows
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 1e18 = 3.00001e41
+    Assert Equal (Comptroller AtlantisAccrued Coburn) 0
+    Assert Equal (Comptroller AtlantisBorrowState aZRX "index") 3.00001e41
+    Assert Equal (Comptroller AtlantisBorrowState aZRX "block") 300000
+    Assert Equal (Bep20 Atlantis TokenBalance Coburn) 300000e18
+    Assert Equal (Comptroller AtlantisBorrowerIndex aZRX Coburn) 3.00001e41
+
+Test "Accrue Atlantis during a liquidation"
+    FlywheelComptroller
+    InitSpeeds
+    Assert Equal (Comptroller AtlantisSpeed aZRX) 1e18
+    Assert Equal (Comptroller AtlantisSpeed aBAT) 0
+    --coburn zrx borrow, bat supply. geoff zrx supply
+    FastForward 600000 Blocks--1e18 borrow * (1 + 600000 * 0.000005) = 3.5e18 borrow > 6e18 collateral * 0.5 CF
+    Prep Geoff Some ZRX aZRX
+    From Geoff (AToken aZRX Liquidate Coburn aBAT 0.5e18)
+    -- zrx borrow index is updated and atlantis distributed
+    -- * new index = initVal + deltaBlocks * borrowSpeed * 1e36 / totalBorrows
+    -- * new index = 1e36 + 600000 * 1e18 * 1e36 / 1e18 = 6.00001E41
+    Assert Equal (Comptroller AtlantisBorrowState aZRX "index") 6.00001e41
+    Assert Equal (Comptroller AtlantisBorrowState aZRX "block") 600000
+    -- zrx supply index isnt updated and atlantis isnt distributed for zrx supply
+    Assert Equal (Comptroller AtlantisSupplyState aZRX "index") 1e36
+    Assert Equal (Comptroller AtlantisSupplyState aZRX "block") 0
+    Assert Equal (Comptroller AtlantisSupplierIndex aZRX Geoff) 1e36--no change, minted in init
+    -- bat supply/borrow index is not updated, since there is no atlantis speed
+    Assert Equal (Comptroller AtlantisSupplyState aBAT "index") 1e36
+    Assert Equal (Comptroller AtlantisSupplyState aBAT "block") 600000
+    -- neither is borrow state. block is 0 because update fn is never even called
+    Assert Equal (Comptroller AtlantisBorrowState aBAT "index") 1e36
+    Assert Equal (Comptroller AtlantisBorrowState aBAT "block") 0
+    --
+    Assert Equal (Comptroller AtlantisSupplierIndex aBAT Coburn) 1e36
+    Assert Equal (Comptroller AtlantisBorrowerIndex aZRX Coburn) 6.00001e41
+    Assert Equal (Bep20 Atlantis TokenBalance Coburn) 600000e18
+    Assert Equal (Comptroller AtlantisAccrued Coburn) 0
+    --
+    Assert Equal (Comptroller AtlantisSupplierIndex aBAT Geoff) 1e36
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 0
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+
+Test "Accrue Atlantis during a transfer"
+    FlywheelComptroller
+    InitSpeeds
+    FastForward 300000 Blocks
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 0
+    Assert Equal (Comptroller AtlantisSupplierIndex aZRX Geoff) 1e36
+    Transfer Geoff Jared 2.5e10 aZRX
+    -- new index = initVal + deltaBlocks * supplySpeed * 1e36 / totalSupply
+    -- new index = 1e36 + 300000 * 1e18 * 1e36 / 2.5e10 = 1.2000000000001e49
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 300000e18
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Assert Equal (Comptroller AtlantisSupplyState aZRX "index") 1.2000000000001e49
+    Assert Equal (Comptroller AtlantisSupplyState aZRX "block") 300000
+    Assert Equal (Comptroller AtlantisSupplierIndex aZRX Geoff) 1.2000000000001e49
+    --
+    Assert Equal (Comptroller AtlantisAccrued Jared) 0
+    Assert Equal (Comptroller AtlantisSupplyState aZRX "index") 1.2000000000001e49
+    Assert Equal (Comptroller AtlantisSupplyState aZRX "block") 300000
+    Assert Equal (Comptroller AtlantisSupplierIndex aZRX Jared) 1.2000000000001e49
+
+Test "Accrues correctly when market is added, deactivated, and activated again"
+    FlywheelComptroller
+    InitSpeeds
+    NewAToken DAI aDAI
+    --
+    Support aDAI collateralFactor:0.5
+    Comptroller AddAtlantisMarkets aDAI
+    Assert Equal (Comptroller GetAtlantisMarkets) [(Address aZRX) (Address aBAT) (Address aDAI)]
+    Prep Jared Some DAI aDAI
+    Mint Jared 6e18 aDAI
+    EnterMarkets Geoff aZRX
+    Borrow Geoff 0.5e18 aDAI
+    Borrow Coburn 0.5e18 aDAI
+    Comptroller RefreshAtlantisSpeeds
+    Assert Equal (Comptroller AtlantisSpeed aZRX) 0.5e18
+    Assert Equal (Comptroller AtlantisSpeed aDAI) 0.5e18
+    --
+    FastForward 100 Blocks
+    Comptroller DropAtlantisMarket aDAI
+    Comptroller ClaimAtl Geoff
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 75e18--half of cdai, all of zrx(.25e18 + .5e18) * 100
+    Assert Equal (Comptroller GetAtlantisMarkets) [(Address aZRX) (Address aBAT)]
+    Assert Equal (Comptroller AtlantisSpeed aZRX) 1e18
+    Assert Equal (Comptroller AtlantisSpeed aDAI) 0
+    --
+    FastForward 100 Blocks
+    Comptroller ClaimAtl Geoff
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 175e18-- += 1e18 * 100
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    --
+    Comptroller AddAtlantisMarkets aDAI
+    FastForward 100 Blocks
+    Comptroller ClaimAtl Geoff
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 250e18--half of cdai, all of zrx. += (.25 + .5) * 100
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+
+Test "TransferAtl handles running out of Atlantis in Comptroller correctly"
+    FlywheelComptroller price:1.0 borrowRate:0.000005 atlantisInitAmount:1e18
+    InitSpeeds
+    FastForward 2 Blocks
+    Comptroller ClaimAtl Geoff
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 2e18
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 0
+    Give (Address Comptroller) 1e18 Atlantis
+    Comptroller ClaimAtl Geoff
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 2e18
+
+Test "Changing Atlantis rate continues to distribute at the correct speed"
+    FlywheelComptroller
+    InitSpeeds
+    --
+    Assert Equal (Comptroller AtlantisSpeed aZRX) 1e18
+    FastForward 10 Blocks
+    Comptroller SetAtlantisRate 2e18
+    Assert Equal (Comptroller AtlantisSpeed aZRX) 2e18
+    FastForward 10 Blocks
+    Comptroller ClaimAtl Geoff
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 30e18

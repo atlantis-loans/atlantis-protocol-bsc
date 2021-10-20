@@ -1,0 +1,49 @@
+
+Test "Borrow some Eth enters Eth and succeeds when Eth not entered"
+    NewComptroller price:1.0
+    ListedAToken ZRX aZRX
+    ListedEtherToken aBNB initialExchangeRate:0.005e9
+    SetCollateralFactor aZRX collateralFactor:0.5
+    SetCollateralFactor aBNB collateralFactor:0.5
+    Donate aBNB 0.003e18
+    Prep Geoff Some ZRX aZRX
+    Mint Geoff 1e18 aZRX
+    EnterMarkets Geoff aZRX
+    Expect Changes (EtherBalance Geoff) +0.001e18
+    BorrowEth Geoff 0.001e18 aBNB
+    Assert Equal (EtherBalance aBNB) 0.002e18
+    Assert Equal (Comptroller Liquidity Geoff) 4.99e17
+    Assert Equal (Comptroller MembershipLength Geoff) (Exactly 2)
+    Assert True (Comptroller CheckMembership Geoff aBNB)
+
+Test "Borrow some BNB fails when no BNB available"
+    NewComptroller price:1.0
+    ListedAToken ZRX aZRX
+    ListedEtherToken aBNB initialExchangeRate:0.005e9
+    SetCollateralFactor aZRX collateralFactor:0.5
+    SetCollateralFactor aBNB collateralFactor:0.5
+    Prep Geoff Some ZRX aZRX
+    Mint Geoff 100e18 aZRX
+    EnterMarkets Geoff aZRX aBNB
+    AllowFailures
+    Invariant Static (AToken aZRX ExchangeRateStored)
+    Invariant Static (AToken aBNB ExchangeRateStored)
+    Invariant Static (Comptroller Liquidity Geoff)
+    Invariant Static (EtherBalance Geoff)
+    BorrowEth Geoff 1e18 aBNB
+    Assert Failure TOKEN_INSUFFICIENT_CASH BORROW_CASH_NOT_AVAILABLE
+
+Test "Borrow some BNB from excess cash"
+    NewComptroller price:1.0
+    ListedAToken ZRX aZRX
+    ListedEtherToken aBNB initialExchangeRate:0.005e9
+    SetCollateralFactor aZRX collateralFactor:0.5
+    SetCollateralFactor aBNB collateralFactor:0.5
+    Donate aBNB 0.003e18
+    Prep Geoff Some ZRX aZRX
+    Mint Geoff 1e18 aZRX
+    EnterMarkets Geoff aZRX aBNB
+    Expect Changes (EtherBalance Geoff) +0.001e18
+    BorrowEth Geoff 0.001e18 aBNB
+    Assert Equal (EtherBalance aBNB) 0.002e18
+    Assert Equal (Comptroller Liquidity Geoff) 4.99e17

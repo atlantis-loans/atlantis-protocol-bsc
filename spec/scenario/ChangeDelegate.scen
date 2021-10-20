@@ -1,0 +1,11 @@
+-- Delegate upgrade tests
+
+Test "Change the delegate"
+    NewComptroller
+    NewAToken DEL cDEL
+    Support cDEL collateralFactor:0.5
+    Prep Jared Some DEL cDEL
+    Mint Jared 100e18 cDEL
+    ATokenDelegate Deploy ABep20Delegate aBep20Delegate2
+    AToken cDEL SetImplementation (ATokenDelegate aBep20Delegate2 Address) True "0x0"
+    Redeem Jared 50e9 cDEL

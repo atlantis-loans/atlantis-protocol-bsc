@@ -1,0 +1,51 @@
+
+Test "Fail to seize calling directly"
+    NewComptroller
+    ListedAToken ZRX aZRX initialExchangeRate:1e9
+    ListedAToken BAT aBAT initialExchangeRate:1e9
+    Prep Geoff Some ZRX aZRX
+    Mint Geoff 50e18 aZRX
+    Invariant Remains (Bep20 aZRX TokenBalance Geoff) 50e9
+    AllowFailures
+    Seize 1e9 aZRX caller:Geoff liquidator:Geoff borrower:Torrey
+    -- The caller must be from another aToken market, thus this fails
+    Assert Failure COMPTROLLER_REJECTION LIQUIDATE_SEIZE_COMPTROLLER_REJECTION MARKET_NOT_LISTED
+
+Test "Seize tokens with a paused WBTC aToken-- like normal"
+    NewComptroller
+    ListedAToken ZRX aZRX initialExchangeRate:1e9
+    ListedAToken WBTC aWBTC initialExchangeRate:0.1 tokenType:WBTC
+    Prep Geoff Some ZRX aZRX
+    Mint Geoff 50e18 aZRX
+    Bep20 WBTC Pause
+    Invariant Remains (Bep20 aZRX TokenBalance Geoff) 50e9
+    AllowFailures
+    Seize 1e9 aWBTC caller:Geoff liquidator:Geoff borrower:Torrey
+    -- The caller must be from another aToken market, thus this fails
+    Assert Failure COMPTROLLER_REJECTION LIQUIDATE_SEIZE_COMPTROLLER_REJECTION MARKET_NOT_LISTED
+
+Test "Not able to seize tokens with a malicious unlisted aToken"
+    NewComptroller
+    ListedAToken ZRX aZRX initialExchangeRate:1e9
+    NewATokenImmutable EVL cEVL initialExchangeRate:1e9 aTokenType:CEvil
+    Prep Geoff Some ZRX aZRX
+    Mint Geoff 50e18 aZRX
+    Invariant Remains (Bep20 aZRX TokenBalance Geoff) 50e9
+    Invariant Static (Bep20 aZRX TokenBalance Geoff)
+    Invariant Static (Bep20 aZRX TokenBalance Torrey)
+    AllowFailures
+    EvilSeize cEVL 1e9 aZRX seizer:Geoff seizee:Torrey
+    -- The caller must be from another aToken market, thus this fails
+    Assert Failure COMPTROLLER_REJECTION LIQUIDATE_SEIZE_COMPTROLLER_REJECTION MARKET_NOT_LISTED
+
+Test "Able to seize tokens with a malicious listed aToken"
+    NewComptroller
+    ListedAToken ZRX aZRX initialExchangeRate:1e9
+    ListedATokenImmutable EVL cEVL initialExchangeRate:1e9 aTokenType:CEvil
+    Prep Geoff Some ZRX aZRX
+    Mint Geoff 50e18 aZRX
+    Assert Equal (Bep20 aZRX TokenBalance Geoff) 50e9
+    Expect Changes (Bep20 aZRX TokenBalance Geoff) -1e9
+    -- effective liquidation reward is 1-.028 = 0.972 after protocolSeizeShare (liq incentive = 1)
+    Expect Changes (Bep20 aZRX TokenBalance Torrey) +0.972e9
+    EvilSeize cEVL 1e9 aZRX seizer:Torrey seizee:Geoff

@@ -1,0 +1,29 @@
+
+Test "Attempt to sweep underlying token"
+    NewComptroller price:1.0
+    NewAToken ZRX aZRX
+    NewAToken BAT aBAT
+    Give aBAT 10e18 BAT -- Faucet some bat to sweep
+    Support aZRX collateralFactor:0.5
+    Support aBAT collateralFactor:0.5
+    AllowFailures
+    aToken aBAT SweepToken BAT
+    Assert Revert "revert ABep20::sweepToken: can not sweep underlying token"
+
+Test "Succesfully Sweep standard non-underlying token from ABep20"
+    NewComptroller price:1.0
+    Bep20 Deploy Standard ZRX "ZRX" 18
+    NewAToken BAT aBAT
+    Give aBAT 10e18 ZRX -- Faucet some ZRX to sweep
+    Support aBAT collateralFactor:0.5
+    aToken aBAT SweepToken ZRX
+    Assert Equal (Bep20 ZRX TokenBalance Admin) (10e18)
+
+Test "Succesfully Sweep non-standard non-underlying token from ABep20"
+    NewComptroller price:1.0
+    Bep20 Deploy NonStandard USDT "USDT" 18
+    NewAToken BAT aBAT
+    Give aBAT 10e18 USDT -- Faucet some USDT to sweep
+    Support aBAT collateralFactor:0.5
+    aToken aBAT SweepToken USDT
+    Assert Equal (Bep20 USDT TokenBalance Admin) (10e18)

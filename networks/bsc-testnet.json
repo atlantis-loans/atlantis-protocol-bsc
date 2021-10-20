@@ -1,0 +1,211 @@
+{
+    "Contracts": {
+        "AtlantisLens": "0x",
+        "Unitroller": "0x",
+        "Comptroller": "0x",
+        "LPVaultProxy": "0x",
+        "LP": "0x",
+        "AtlantisVaultProxy": "0x",
+        "aBNB": "0x",
+        "aATL": "0x",
+        "ATL": "0x",
+        "aBUSD": "0x",
+        "BUSD": "0x",
+        "aETH": "0x",
+        "ETH": "0x",
+        "aBTC": "0x",
+        "BTCB": "0x",
+        "aUSDC": "0x",
+        "USDC": "0x",
+        "aUSDT": "0x",
+        "USDT": "0x",
+        "aLINK": "0x",
+        "LINK": "0x",
+        "Timelock": "0x",
+        "GovernorAlpha": "0x",
+        "AtlantisPriceOracle": "0x",
+        "Base0bps_Slope1200bps_Jump2800bps_Kink80": "0x"
+       
+    },
+    "Blocks": {
+        "AtlantisLens": 0,
+        "Unitroller": 0,
+        "Comptroller": 0,
+        "LPVaultProxy": 0,
+        "LP": 0,
+        "AtlantisVaultProxy": 0,
+        "aBNB": 0,
+        "aATL": 0,
+        "ATL": 0,
+        "aBUSD": 0,
+        "BUSD": 0,
+        "aETH": 0,
+        "ETH": 0,
+        "aBTC": 0,
+        "BTCB": 0,
+        "aUSDC": 0,
+        "USDC": 0,
+        "aUSDT": 0,
+        "USDT": 0,
+        "aLINK": 0,
+        "LINK": 0,
+        "Timelock": 0,
+        "GovernorAlpha": 0,
+        "AtlantisPriceOracle": 0,
+        "Base0bps_Slope1200bps_Jump2800bps_Kink80": 0
+    },
+    "AtlantisLens": {
+        "name": "AtlantisLens",
+        "contract": "AtlantisLens"
+    },
+    "Unitroller": {
+        "description": "Unitroller",
+        "address": "0x"
+    },
+    "Comptroller": {
+        "Comptroller": {
+            "address": "0x",
+            "contract": "Comptroller",
+            "description": "Atlantis Comptroller Contract"
+        }
+    },
+    "Timelock": {
+        "Timelock": {
+            "address": "0x",
+            "contract": "Timelock",
+            "description": "Timelock"
+        }
+    },
+    "Constructors": {
+        "AtlantisLens": "0x",
+        "Unitroller": "0x",
+        "Comptroller": "0x",
+        "LPVaultProxy": "0x",
+        "LP": "0x",
+        "AtlantisVaultProxy": "0x",
+        "aBNB": "0x",
+        "aATL": "0x",
+        "ATL": "0x",
+        "aBUSD": "0x",
+        "BUSD": "0x",
+        "aETH": "0x",
+        "ETH": "0x",
+        "aBTC": "0x",
+        "BTCB": "0x",
+        "aUSDC": "0x",
+        "USDC": "0x",
+        "aUSDT": "0x",
+        "USDT": "0x",
+        "aLINK": "0x",
+        "LINK": "0x",
+        "Timelock": "0x",
+        "GovernorAlpha": "0x",
+        "AtlantisPriceOracle": "0x",
+        "Base0bps_Slope1200bps_Jump2800bps_Kink80": "0x"
+    },
+    "ATokenDelegate": {
+        "ATokenDelegate": {
+            "address": "0x",
+            "contract": "ABep20Delegate",
+            "description": "Delegate ABep20Delegate"
+        }
+    },
+    "aTokens": {
+        "aUSDC": {
+            "name": "Atlantis USDC",
+            "symbol": "aUSDC",
+            "decimals": 8,
+            "address": "0x",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "0x",
+            "contract": "ABep20Delegate"
+        },
+        "aUSDT": {
+            "name": "Atlantis USDT",
+            "symbol": "aUSDT",
+            "decimals": 8,
+            "address": "0x",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "0x",
+            "contract": "ABep20Delegate"
+        },
+        "aBUSD": {
+            "name": "Atlantis BUSD",
+            "symbol": "aBUSD",
+            "decimals": 8,
+            "address": "0x",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "0x",
+            "contract": "ABep20Delegate"
+        },
+        "aATL": {
+            "name": "Atlantis ATL",
+            "symbol": "aATL",
+            "decimals": 8,
+            "address": "0x",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "0x",
+            "contract": "ABep20Delegate"
+        },
+        "aBNB": {
+            "name": "Atlantis BNB",
+            "symbol": "aBNB",
+            "decimals": 8,
+            "address": "0x",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "",
+            "contract": "aBNB"
+        },
+        "aETH": {
+            "name": "Atlantis BNB",
+            "symbol": "aETH",
+            "decimals": 8,
+            "address": "0x",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "",
+            "contract": "aETH"
+        },
+        "aBTC": {
+            "name": "Atlantis BNB",
+            "symbol": "aBTC",
+            "decimals": 8,
+            "address": "0x",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "",
+            "contract": "aBTC"
+        },
+        "aLINK": {
+            "name": "Atlantis LINK",
+            "symbol": "aLINK",
+            "decimals": 8,
+            "address": "0x",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "0x",
+            "contract": "ABep20Delegate"
+        }
+    },
+    "InterestRateModel": {
+        "Base0bps_Slope1200bps_Jump2800bps_Kink80": {
+            "name": "Base0bps_Slope1200bps_Jump2800bps_Kink80",
+            "contract": "JumpRateModelV2",
+            "description": "JumpRateModelV2 baseRate=0 multiplier=120000000000000000 jump=2800000000000000000 kink=800000000000000000",
+            "address": "0x",
+            "base": "0",
+            "slope": "120000000000000000",
+            "jump": "2800000000000000000",
+            "kink": "800000000000000000"
+        }
+    },
+    "PriceOracle": {
+        "description": "AtlantisPriceOracle",
+        "address": "0x"
+    }
+}

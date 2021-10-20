@@ -1,0 +1,43 @@
+
+Test "Set admin"
+    NewComptroller
+    NewAToken ZRX aZRX
+    Assert Equal (AToken aZRX Admin) (Address Root)
+    Assert Equal (AToken aZRX PendingAdmin) (Address Zero)
+    From Root (AToken aZRX SetPendingAdmin Geoff)
+    Assert Equal (AToken aZRX Admin) (Address Root)
+    Assert Equal (AToken aZRX PendingAdmin) (Address Geoff)
+    From Geoff (AToken aZRX AcceptAdmin)
+    Assert Equal (AToken aZRX Admin) (Address Geoff)
+    Assert Equal (AToken aZRX PendingAdmin) (Address Zero)
+
+Test "Set admin to contructor argument"
+    NewComptroller
+    NewAToken ZRX aZRX admin:Torrey
+    Assert Equal (AToken aZRX Admin) (Address Torrey)
+    Assert Equal (AToken aZRX PendingAdmin) (Address Zero)
+    From Torrey (AToken aZRX SetPendingAdmin Geoff)
+    Assert Equal (AToken aZRX Admin) (Address Torrey)
+    Assert Equal (AToken aZRX PendingAdmin) (Address Geoff)
+    From Geoff (AToken aZRX AcceptAdmin)
+    Assert Equal (AToken aZRX Admin) (Address Geoff)
+    Assert Equal (AToken aZRX PendingAdmin) (Address Zero)
+
+
+Test "Fail to set pending admin"
+    NewComptroller
+    NewAToken ZRX aZRX
+    Invariant Remains (AToken aZRX Admin) (Address Root)
+    Invariant Remains (AToken aZRX PendingAdmin) (Address Zero)
+    AllowFailures
+    From Geoff (AToken aZRX SetPendingAdmin Geoff)
+    Assert Failure UNAUTHORIZED SET_PENDING_ADMIN_OWNER_CHECK
+
+Test "Fail to accept admin"
+    NewComptroller
+    NewAToken ZRX aZRX
+    Invariant Remains (AToken aZRX Admin) (Address Root)
+    Invariant Remains (AToken aZRX PendingAdmin) (Address Zero)
+    AllowFailures
+    From Geoff (AToken aZRX AcceptAdmin)
+    Assert Failure UNAUTHORIZED ACCEPT_ADMIN_PENDING_ADMIN_CHECK

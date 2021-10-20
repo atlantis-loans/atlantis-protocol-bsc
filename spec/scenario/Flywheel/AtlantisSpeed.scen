@@ -1,0 +1,95 @@
+-- Tests for the grants and math patch
+
+Macro FlywheelComptroller price=1.0 borrowRate=0.000005 atlantisInitAmount=5000000e18
+    Unitroller Deploy
+    PriceOracle Deploy Fixed price
+    PriceOracleProxy Deploy Admin (PriceOracle Address) (Address Zero) (Address Zero) (Address Zero) (Address Zero) (Address Zero)
+    ----g2
+    ComptrollerImpl Deploy ScenarioG2 ComptrollerScenG2
+    Unitroller SetPendingImpl ComptrollerScenG2
+    ComptrollerImpl ComptrollerScenG2 BecomeG2
+    --list some tokens
+    Comptroller SetPriceOracle (PriceOracleProxy Address)
+    Comptroller SetMaxAssets 20
+    Comptroller SetCloseFactor 0.5
+    Comptroller LiquidationIncentive 1.1
+    NewAToken ZRX aZRX
+    NewAToken BAT aBAT
+    Support aZRX collateralFactor:0.5
+    Support aBAT collateralFactor:0.5
+    -- final
+    ComptrollerImpl Deploy ScenarioG3 ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen BecomeG3 1e18 [aZRX aBAT]
+    Bep20 Deploy Standard Atlantis "Atlantis Token" 18
+    Give (Address Comptroller) atlantisInitAmount Atlantis
+
+Macro GrantsComptroller
+    FlywheelComptroller
+    -- g4
+    ComptrollerImpl Deploy ScenarioG4 ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen BecomeG4
+    -- g5
+    ComptrollerImpl Deploy ScenarioG5 ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen BecomeG5
+    -- current
+    ComptrollerImpl Deploy Scenario ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen Become
+
+Macro InitSpeeds
+    Prep Geoff 100e18 ZRX aZRX
+    Mint Geoff 50e18 aZRX--tokenbalance = 50e18 / 2e9 = 2.5e10
+    Prep Coburn Some BAT aBAT
+    Mint Coburn 6e18 aBAT--tokenbalance = 6e18 / 2e9 = 3e9
+    EnterMarkets Coburn aBAT
+    Borrow Coburn 1e18 aZRX
+    Comptroller SetAtlantisSpeed aZRX 1
+    Comptroller SetAtlantisSpeed aBAT 1
+    Comptroller RefreshAtlantisSpeeds
+    Comptroller Send "setAtlantisAddress(address)" (Address Atlantis)
+
+Test "Atlantis speed can be set per market"
+    GrantsComptroller
+    InitSpeeds
+    -- Baseline atlantis amounts
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 0
+    -- Atlantis speed can be set
+    Comptroller SetAtlantisSpeed aZRX 2
+    FastForward 1000 Blocks
+    Comptroller ClaimAtl Geoff
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 2000
+    -- Atlantis speed can be changed
+    Comptroller SetAtlantisSpeed aZRX 4
+    FastForward 1000 Blocks
+    Comptroller ClaimAtl Geoff
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 6000
+    -- Atlantis speed can be removed
+    Comptroller SetAtlantisSpeed aZRX 0
+    FastForward 1000 Blocks
+    Comptroller ClaimAtl Geoff
+    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 6000
+
+Test "Set atlantis rate is removed"
+    GrantsComptroller
+    InitSpeeds
+    AllowFailures
+    Comptroller SetAtlantisRate 5
+
+Test "Atlantis is not claimed automatically"
+    GrantsComptroller
+    InitSpeeds
+    Comptroller SetAtlantisSpeed aZRX 2
+    FastForward 100000 Blocks
+    -- Check atlantis is not claimed automatically
+    Mint Geoff 50e18 aZRX
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 0
+    -- Confirm there was atlantis to claim
+    Comptroller ClaimAtl Geoff
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 200000

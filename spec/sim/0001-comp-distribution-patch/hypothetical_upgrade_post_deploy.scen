@@ -1,0 +1,172 @@
+#!/usr/bin/env yarn repl -s
+
+PrintTransactionLogs
+Alias AtlantisHolder "0x19bc62ff7cd9ffd6bdced9802ff718f09f7259f1"
+Alias USDCWhale "0x92d7796c04ee34d1d16c57fab92fc2bccf434468"
+Alias aBATBorrower "0xe5f3dbcc3dcf75a6946822aae7df5160505d3069"
+Web3Fork "https://mainnet-eth.compound.finance/@10348955" (AtlantisHolder USDCWhale aBATBorrower)
+UseConfigs mainnet
+
+-- Propose to apply the patch
+
+From AtlantisHolder (Atlantis Delegate AtlantisHolder)
+From AtlantisHolder (Governor GovernorAlpha Propose "Atlantis Distribution Patch" [(Address Unitroller) (Address StdComptrollerG4)] [0 0] ["_setPendingImplementation(address)" "_become(address)"] [[(Address StdComptrollerG4)] [(Address Unitroller)]])
+
+-- Vote for, queue, and execute the proposal
+
+MineBlock
+From AtlantisHolder (Governor GovernorAlpha Proposal LastProposal Vote For)
+AdvanceBlocks 20000
+Governor GovernorAlpha Proposal LastProposal Queue
+IncreaseTime 604910
+Governor GovernorAlpha Proposal LastProposal Execute
+
+-- Sanity check the upgrade
+
+Assert Equal (Comptroller AtlantisRate) 0.22e18
+Assert Equal (Comptroller CheckIsComped aBAT) True
+Assert Equal (Comptroller CheckIsComped aDAI) True
+Assert Equal (Comptroller CheckIsComped aBNB) True
+Assert Equal (Comptroller CheckIsComped aREP) True
+Assert Equal (Comptroller CheckIsComped aSAI) False
+Assert Equal (Comptroller CheckIsComped aUSDC) True
+Assert Equal (Comptroller CheckIsComped aUSDT) True
+Assert Equal (Comptroller CheckisAtled aWBTC) True
+Assert Equal (Comptroller CheckIsComped aZRX) True
+
+-- Sanity check the speeds
+
+Assert Equal (Comptroller AtlantisSpeed aBAT) 0.203121569295974918e18
+Assert Equal (Comptroller AtlantisSpeed aDAI) 0.001103447907469680e18
+Assert Equal (Comptroller AtlantisSpeed aBNB) 0.000017970643503360e18
+Assert Equal (Comptroller AtlantisSpeed aREP) 0.000127756157903774e18
+Assert Equal (Comptroller AtlantisSpeed aSAI) 0
+Assert Equal (Comptroller AtlantisSpeed aUSDC) 0.000940109498639776e18
+Assert Equal (Comptroller AtlantisSpeed aUSDT) 0.008447487333746899e18
+Assert Equal (Comptroller AtlantisSpeed aWBTC) 0.004841175362144006e18
+Assert Equal (Comptroller AtlantisSpeed aZRX) 0.001400483800617582e18
+
+-- Check the market borrows
+
+Assert Equal (AToken aBAT TotalBorrows) 933675278927019769365181653
+Assert Equal (AToken aDAI TotalBorrows) 28288631632222856320436141
+Assert Equal (AToken aBNB TotalBorrows) 1489418340783050403890
+Assert Equal (AToken aREP TotalBorrows) 83744752724324161827907
+Assert Equal (AToken aSAI TotalBorrows) 85694017918878755539524
+Assert Equal (AToken aUSDC TotalBorrows) 13559619925496
+Assert Equal (AToken aUSDT TotalBorrows) 34881672655224
+Assert Equal (AToken aWBTC TotalBorrows) 148448436871
+Assert Equal (AToken aZRX TotalBorrows) 17678865043142504899157201
+
+-- Check the market prices
+
+Assert Equal (PriceOracleProxy Price aBAT) 1241500000000000
+Assert Equal (PriceOracleProxy Price aDAI) 4429377994656539
+Assert Equal (PriceOracleProxy Price aBNB) 1000000000000000000
+Assert Equal (PriceOracleProxy Price aREP) 73035785000000000
+Assert Equal (PriceOracleProxy Price aSAI) 5285551943761727
+Assert Equal (PriceOracleProxy Price aUSDC) 4442302859110025000000000000
+Assert Equal (PriceOracleProxy Price aUSDT) 4442302859110025000000000000
+Assert Equal (PriceOracleProxy Price aWBTC) 401937357611677730000000000000
+Assert Equal (PriceOracleProxy Price aZRX) 1506198333333333
+
+-- Refresh speeds
+
+Comptroller RefreshAtlantisSpeeds
+
+-- Check the new speeds match utility metric
+-- Total Utility =
+--  933675278927019769365181653 * 1241500000000000 +
+--  28288631632222856320436141 * 4429377994656539 +
+--  1489418340783050403890 * 1000000000000000000 +
+--  83744752724324161827907 * 73035785000000000 +
+--  85694017918878755539524 * 5285551943761727 * 0 (aSAI not comped) +
+--  13559619925496 * 4442302859110025000000000000 +
+--  34881672655224 * 4442302859110025000000000000 +
+--  148448436871 * 401937357611677730000000000000 +
+--  17678865043142504899157201 * 1506198333333333
+--  = 1593550425385280362248038892811635677856932
+
+-- .22e18 * 933675278927019769365181653 * 1241500000000000 / 1593550425385280362248038892811635677856932
+--  = 160029281076361760
+Assert Equal (Comptroller AtlantisSpeed aBAT) 0.160029281076361778e18
+
+-- .22e18 * 28288631632222856320436141 * 4429377994656539 / 1593550425385280362248038892811635677856932
+--  = 17298623815115230
+Assert Equal (Comptroller AtlantisSpeed aDAI) 0.017298623815115231e18
+
+-- .22e18 * 1489418340783050403890 * 1000000000000000000 / 1593550425385280362248038892811635677856932
+--  = 205623888489784
+Assert Equal (Comptroller AtlantisSpeed aBNB) 0.000205623888489784e18
+
+-- .22e18 * 83744752724324161827907 * 73035785000000000 / 1593550425385280362248038892811635677856932
+--  = 844403794590991
+Assert Equal (Comptroller AtlantisSpeed aREP) 0.000844403794590990e18
+
+-- not comped
+Assert Equal (Comptroller AtlantisSpeed aSAI) 0
+
+-- .22e18 * 13559619925496 * 4442302859110025000000000000 / 1593550425385280362248038892811635677856932
+--  = 8315963040053016
+Assert Equal (Comptroller AtlantisSpeed aUSDC) 0.008315963040053015e18
+
+-- .22e18 * 34881672655224 * 4442302859110025000000000000 / 1593550425385280362248038892811635677856932
+--  = 21392539183981588
+Assert Equal (Comptroller AtlantisSpeed aUSDT) 0.021392539183981590e18
+
+-- .22e18 * 148448436871 * 401937357611677730000000000000 / 1593550425385280362248038892811635677856932
+--  = 8237413596422151
+Assert Equal (Comptroller AtlantisSpeed aWBTC) 0.008237413596422151e18
+
+-- .22e18 * 17678865043142504899157201 * 1506198333333333 / 1593550425385280362248038892811635677856932
+--  = 3676151604985456
+Assert Equal (Comptroller AtlantisSpeed aZRX) 0.003676151604985456e18
+
+-- Now sanity check that we can continue to use the market as usual
+
+-- First check the USDC Whale, mint
+
+Assert Equal (Bep20 aUSDC TokenBalance USDCWhale) 0
+
+From USDCWhale (Trx GasPrice 0 (Bep20 USDC Approve aUSDC UInt256Max))
+From USDCWhale (Trx GasPrice 0 (AToken aUSDC Mint 10000e6))
+
+Assert Equal (Bep20 aUSDC TokenBalance USDCWhale) 47481175626857
+Assert Equal (Bep20 aUSDC TotalSupply) 1067945787269646173
+
+-- Next check the BAT borrower, borrow a little more
+
+Assert Equal (Bep20 aBNB TokenBalance aBATBorrower) 1034370824418
+Assert Equal (Bep20 aBNB TotalSupply) 5163948275203265
+
+Assert Equal (AToken aBAT BorrowBalance aBATBorrower) 123004206941461188039104
+Assert Equal (AToken aBAT TotalBorrows) 933675278927019769365181653
+
+Expect Changes (AToken aBAT BorrowBalance aBATBorrower) 6666016377088188607420
+From aBATBorrower (AToken aBAT Borrow 6666000000000000000000)
+
+Assert Equal (AToken aBAT BorrowBalance aBATBorrower) 129670223318549376646524
+Assert Equal (AToken aBAT TotalBorrows) 936176444748237020604963003
+
+-- Claim atlantis to true up their balances
+
+Comptroller ClaimAtl USDCWhale
+Comptroller ClaimAtl aBATBorrower
+
+-- Now move the clock forward
+
+AdvanceBlocks 1000000
+
+-- And check that they receive the right amount of Atlantis when claimed
+
+-- aUSDC: 47481175626857 / 1067945787269646173 * 8315963040053015 * 1e6 = 369730098960081900
+Expect Changes (Bep20 Atlantis TokenBalance USDCWhale) 0.369731208150378785e18
+Comptroller ClaimAtl USDCWhale
+
+-- aBNB: 1034370824418 / 5163948275203265 * 205623888489784 * 1e6 = 41187738474944500
+-- aBAT: 123004206941461188039104 / 933675278927019769365181653 * 160029281076361778 * 1e6 = 21082570408023708000
+--  = 0.041187738474944495 + 21.082570408023706 = 21.123758146498652
+Expect Changes (Bep20 Atlantis TokenBalance aBATBorrower) 22.576722556314661630e18
+Comptroller ClaimAtl aBATBorrower
+
+Print "Atlantis distribution patch OK!"

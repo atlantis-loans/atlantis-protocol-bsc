@@ -1,0 +1,102 @@
+#!/usr/bin/env yarn repl -s
+
+-- This script tests a hypothetical upgrade with manual Atlantis claims and manual Atlantis speed setting
+
+PrintTransactionLogs
+Alias AtlantisHolder "0xC89b6f0146642688bb254bF93C28fcCF1E182C81"
+Alias USDCWhale "0x3dfd23a6c5e8bbcfc9581d2e864a68feb6a076d3"
+Alias DAIWhale "0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503"
+Web3Fork "https://mainnet-eth.compound.finance/@11458477" (AtlantisHolder USDCWhale DAIWhale)
+UseConfigs mainnet
+
+-- Deploy the flywheel impl
+ComptrollerImpl Deploy Standard ComptrollerG7
+
+-- Baseline USDC atlantis speed before the patch
+Assert Equal (Comptroller AtlantisSpeed aUSDC) 5.3786477206671197e16
+
+-- Mint tokens
+From DAIWhale (Trx GasPrice 0 (Bep20 DAI Approve aDAI UInt256Max))
+From DAIWhale (Trx GasPrice 0 (AToken aDAI Mint 10000e6))
+From USDCWhale (Trx GasPrice 0 (Bep20 USDC Approve aUSDC UInt256Max))
+From USDCWhale (Trx GasPrice 0 (AToken aUSDC Mint 10000e6))
+
+-- Baseline Atlantis claim speed
+Assert Equal (Comptroller CheckIsComped aDAI) True
+
+Comptroller ClaimAtl DAIWhale
+AdvanceBlocks 1000
+Expect Changes (Bep20 Atlantis TokenBalance DAIWhale) 7.77e2
+Comptroller ClaimAtl DAIWhale
+
+-- Propose to apply the patch
+
+From AtlantisHolder (Atlantis Delegate AtlantisHolder)
+From AtlantisHolder (Governor GovernorAlpha Propose "Disable automatic atlantis speed refresh and automatic claims and change atlantis speed" [(Address Unitroller) (Address ComptrollerG7) (Address Unitroller)] [0 0 0] ["_setPendingImplementation(address)" "_become(address)" "_setAtlantisSpeed(address,uint256)"] [[(Address ComptrollerG7)] [(Address Unitroller)] [(Address aUSDC) 30000000000000000]])
+
+-- Vote for, queue, and execute the proposal
+
+MineBlock
+From AtlantisHolder (Governor GovernorAlpha Proposal LastProposal Vote For)
+AdvanceBlocks 20000
+Governor GovernorAlpha Proposal LastProposal Queue
+IncreaseTime 604910
+Governor GovernorAlpha Proposal LastProposal Execute
+ComptrollerImpl ComptrollerG7 MergeABI
+
+-- Check that speed has changed
+Assert Equal (Comptroller AtlantisSpeed aUSDC) 3.0e16
+
+-- Check that Atlantis is still accruing at the same speed
+Comptroller ClaimAtl DAIWhale
+AdvanceBlocks 1000
+Expect Changes (Bep20 Atlantis TokenBalance DAIWhale) 7.77e2
+Comptroller ClaimAtl DAIWhale
+
+-- Check that minting some USDC wont result in any automatic claims
+AdvanceBlocks 1000000
+From USDCWhale (Trx GasPrice 0 (Bep20 USDC Approve aUSDC UInt256Max))
+Expect Changes (Bep20 Atlantis TokenBalance USDCWhale) 0
+From USDCWhale (Trx GasPrice 0 (AToken aUSDC Mint 10000e6))
+
+-- Prepare second proposal
+From AtlantisHolder (Governor GovernorAlpha Propose "Remove USDC market by setting atlantis speed to 0" [(Address Unitroller)] [0] ["_setAtlantisSpeed(address,uint256)"] [[(Address aUSDC) 0]])
+
+-- Vote for, queue, and execute the second proposal
+
+MineBlock
+From AtlantisHolder (Governor GovernorAlpha Proposal LastProposal Vote For)
+AdvanceBlocks 20000
+Governor GovernorAlpha Proposal LastProposal Queue
+IncreaseTime 604910
+Governor GovernorAlpha Proposal LastProposal Execute
+
+AdvanceBlocks 1000
+
+-- Check speed is now 0
+Assert Equal (Comptroller AtlantisSpeed aUSDC) 0
+
+-- True up balances
+Comptroller ClaimAtl USDCWhale
+
+-- Check no more atlantis accrued
+AdvanceBlocks 1000000
+Expect Changes (Bep20 Atlantis TokenBalance USDCWhale) 0
+Comptroller ClaimAtl USDCWhale
+
+-- Prepare final proposal
+From AtlantisHolder (Governor GovernorAlpha Propose "Reset USDC atlantis speed" [(Address Unitroller)] [0] ["_setAtlantisSpeed(address,uint256)"] [[(Address aUSDC) 27000000000000000]])
+
+-- Vote for, queue, and execute the final proposal
+
+MineBlock
+From AtlantisHolder (Governor GovernorAlpha Proposal LastProposal Vote For)
+AdvanceBlocks 20000
+Governor GovernorAlpha Proposal LastProposal Queue
+IncreaseTime 604910
+Governor GovernorAlpha Proposal LastProposal Execute
+
+-- Check new speed
+Assert Equal (Comptroller AtlantisSpeed aUSDC) 2.7e16
+
+Print "Upgrade OK!"

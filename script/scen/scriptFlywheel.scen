@@ -1,0 +1,59 @@
+#!/usr/bin/env yarn run repl -s
+-- Deploys basic ComptrollerG3
+
+Unitroller Deploy
+PriceOracle Deploy Fixed 1.0
+PriceOracleProxy Deploy Admin (PriceOracle Address) (Address Zero) (Address Zero) (Address Zero) (Address Zero) (Address Zero)
+----g2
+ComptrollerImpl Deploy ScenarioG2 ComptrollerScenG2
+Unitroller SetPendingImpl ComptrollerScenG2
+ComptrollerImpl ComptrollerScenG2 BecomeG2
+--list some tokens
+Comptroller SetPriceOracle (PriceOracleProxy Address)
+Comptroller SetMaxAssets 20
+Comptroller SetCloseFactor 0.5
+Comptroller LiquidationIncentive 1.1
+NewAToken ZRX aZRX
+NewAToken BAT aBAT
+Support aZRX collateralFactor:0.5
+Support aBAT collateralFactor:0.5
+-- final
+ComptrollerImpl Deploy Scenario ComptrollerScen
+Unitroller SetPendingImpl ComptrollerScen
+
+Prep Geoff 100e18 ZRX aZRX
+Mint Geoff 50e18 aZRX--tokenbalance = 50e18 / 2e9 = 2.5e10
+
+Prep Fourth Some BAT aBAT
+Mint Fourth 6e18 aBAT
+EnterMarkets Fourth aBAT
+Borrow Fourth 1e18 aZRX
+
+Prep Fifth Some BAT aBAT
+Mint Fifth 6e18 aBAT
+EnterMarkets Fifth aBAT
+Borrow Fifth 1e18 aZRX
+
+Prep Sixth Some BAT aBAT
+Mint Sixth 6e18 aBAT
+EnterMarkets Sixth aBAT
+Borrow Sixth 1e18 aZRX
+
+Prep Seventh Some BAT aBAT
+Mint Seventh 6e18 aBAT
+EnterMarkets Seventh aBAT
+Borrow Seventh 1e18 aZRX
+
+ComptrollerImpl ComptrollerScen Become 1e18 [aZRX aBAT]
+Bep20 Deploy Standard Atlantis "Atlantis Token" 18
+Give (Address Comptroller) 5000000e18 Atlantis
+Comptroller Send "setAtlantisAddress(address)" (Address Atlantis)
+
+Comptroller RefreshAtlantisSpeeds
+
+FastForward 300000 Blocks
+Read (Comptroller Address)
+Read (Address Fourth)
+Read (Address Fifth)
+Read (Address Sixth)
+Read (Address Seventh)

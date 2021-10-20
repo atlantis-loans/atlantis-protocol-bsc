@@ -1,0 +1,39 @@
+#!/usr/bin/env yarn repl -s
+
+Alias AtlantisHolder "0x7587cAefc8096f5F40ACB83A09Df031a018C66ec"
+Alias Liquidator "0x7d6149ad9a573a6e2ca6ebf7d4897c1b766841b4"
+Alias UniHolder "0x767ecb395def19ab8d1b2fcc89b3ddfbed28fd6b"
+Web3Fork "https://kovan.infura.io/v3/e1a5d4d2c06a4e81945fca56d0d5d8ea@14760012" (AtlantisHolder UniHolder Liquidator)
+UseConfigs mainnet
+
+From AtlantisHolder (Atlantis Delegate AtlantisHolder)
+From AtlantisHolder (Governor GovernorBravo Propose "Update aBEP20 Implementation" [(Address aATL) (Address aDAI) (Address aUNI) (Address aUSDT) (Address aWBTC2)] [0 0 0 0 0] ["_setImplementation(address,bool,bytes)" "_setImplementation(address,bool,bytes)" "_setImplementation(address,bool,bytes)" "_setImplementation(address,bool,bytes)" "_setImplementation(address,bool,bytes)"] [[(address aBep20ImplG2) false "0x"] [(address aBep20ImplG2) false "0x"][(address aBep20ImplG2) false "0x"][(address aBep20ImplG2) false "0x"][(address aBep20ImplG2) false "0x"]])
+
+-- upgrade to mainnet abep20delegate deployment
+From AtlantisHolder (Governor GovernorBravo Propose "Update aBEP20 Implementation" [(Address aDAI)] [0] ["_setImplementation(address,bool,bytes)"] [[(address aBep20ImplG2) false "0x"]])
+
+AdvanceBlocks 13140
+From AtlantisHolder (GovernorBravo GovernorBravo Proposal LastProposal Vote For)
+AdvanceBlocks 20000
+Governor GovernorBravo Proposal LastProposal Queue
+IncreaseTime 604910
+Governor GovernorBravo Proposal LastProposal Execute
+
+-- Test basic actions
+From Liquidator (AToken aDAI RedeemUnderlying 20000e18)
+From UniHolder (AToken aUSDC Borrow 8e13)
+
+Print "Migration to reserve delegate is ok"
+
+From AtlantisHolder (GovernorBravo GovernorBravo Propose "Update Comptroller implementation" [(Address Unitroller) (Address ComptrollerG8)] [0 0] ["_setPendingImplementation(address)" "_become(address)"] [[(Address ComptrollerG8)] [(Address Unitroller)]])
+
+AdvanceBlocks 13140
+From AtlantisHolder (GovernorBravo GovernorBravo Proposal LastProposal Vote For)
+AdvanceBlocks 20000
+Governor GovernorBravo Proposal LastProposal Queue
+IncreaseTime 604910
+Governor GovernorBravo Proposal LastProposal Execute
+
+From Root (Comptroller ClaimAtl Root)
+
+Print "Migration to new comptroller ok"

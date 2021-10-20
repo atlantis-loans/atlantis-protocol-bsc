@@ -1,0 +1,42 @@
+#!/usr/bin/env yarn repl -s
+
+PrintTransactionLogs
+Alias AtlantisHolder "0xC89b6f0146642688bb254bF93C28fcCF1E182C81"
+Alias aUNISender "0xf22c2e3475e4a066f4e9f44567c950dd36112d05"
+Alias UniHolder "0x5518C31f4A22782E5a7046711FACF985985530c7"
+Alias CUSDCHolder "0x926e78b8DF67e129011750Dd7b975f8E50D3d7Ad"
+Web3Fork "https://mainnet-eth.compound.finance/@11746553" (AtlantisHolder CUSDCHolder UniHolder)
+UseConfigs mainnet
+
+
+-- Delegate and propose update
+ATokenDelegate Deploy ABep20Delegate newCUNIImpl
+
+From AtlantisHolder (Atlantis Delegate AtlantisHolder)
+From AtlantisHolder (Governor GovernorAlpha Propose "Update aUNI implementation" [(Address aUNI) (Address aUNI) (Address aUNI)] [0 0 0] ["_setImplementation(address,bool,bytes)" "sweepToken(address)" "transfer(address,uint256)"] [[(address newCUNIImpl) false "0x"] [(address aUNI)] [(address aUNISender) 1]])
+
+-- Fast forward, vote, queue, execute
+MineBlock
+From AtlantisHolder (Governor GovernorAlpha Proposal LastProposal Vote For)
+AdvanceBlocks 20000
+Governor GovernorAlpha Proposal LastProposal Queue
+IncreaseTime 604910
+Governor GovernorAlpha Proposal LastProposal Execute
+
+Assert Equal (Bep20 (Address aUNI) TokenBalance aUNISender) (1)
+Assert Equal (Bep20 (Address aUNI) TokenBalance Timelock) (179874258721489)
+
+-- Ensure accrue interest works
+AToken aUNI AccrueInterest
+
+-- Mint Test
+Assert Equal (Bep20 Uni TokenBalance aUNI) (8841949597201167092831625)
+From UniHolder (Bep20 Uni Approve aUNI 10000000)
+From UniHolder (AToken aUNI Mint 10000000)
+Assert Equal (Bep20 Uni TokenBalance aUNI) (8841949597201167102831625)
+
+-- Borrow Test
+From CUSDCHolder (AToken aUNI Borrow 10000000)
+Assert Equal (Bep20 Uni TokenBalance CUSDCHolder) (10000000)
+
+Print "aUNI implementation migration ok" 
