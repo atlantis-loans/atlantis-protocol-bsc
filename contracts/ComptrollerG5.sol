@@ -1430,6 +1430,6 @@ contract ComptrollerG5 is ComptrollerV4Storage, ComptrollerInterface, Comptrolle
      * @return The address of Atlantis
      */
     function getAtlantisAddress() public view returns (address) {
-        return 0xc00e94Cb662C3520282E6f5717214004A7f26888;
+        return 0x1fD991fb6c3102873ba68a4e6e6a87B3a5c10271;
     }
 }

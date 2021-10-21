@@ -28,7 +28,7 @@
         "Pair_ATL_BNB": "0xcffdded873554f362ac02f8fb1f02e5ada10516f",
         "Reservoir": "0x2775b1c75658Be0F640272CCb8c72ac986009e38",
         "Comptroller": "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B",
-        "Atlantis": "0xc00e94Cb662C3520282E6f5717214004A7f26888",
+        "Atlantis": "0x1fD991fb6c3102873ba68a4e6e6a87B3a5c10271",
         "UNI": "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
         "aUSDT": "0xf650C3d88D12dB855b8bf7D11Be6C55A4e07dCC9",
         "aBAT": "0x6C8c6b02E7b2BE14d4fA6022Dfd6d75921D90E4E",
@@ -205,7 +205,7 @@
         "symbol": "Atlantis",
         "name": "Atlantis",
         "decimals": 18,
-        "address": "0xc00e94Cb662C3520282E6f5717214004A7f26888"
+        "address": "0x1fD991fb6c3102873ba68a4e6e6a87B3a5c10271"
     },
     "PriceData": {
         "description": "Open Oracle Price Data",
@@ -315,7 +315,7 @@
             "symbol": "Atlantis",
             "name": "Atlantis Governance Token",
             "decimals": 18,
-            "address": "0xc00e94Cb662C3520282E6f5717214004A7f26888"
+            "address": "0x1fD991fb6c3102873ba68a4e6e6a87B3a5c10271"
         },
         "UNI": {
             "name": "Uniswap",
@@ -458,7 +458,7 @@
             "initial_exchange_rate_mantissa": "20000000000000000",
             "name": "Atlantis Collateral",
             "symbol": "aATL",
-            "underlying": "0xc00e94cb662c3520282e6f5717214004a7f26888"
+            "underlying": "0x1fD991fb6c3102873ba68a4e6e6a87B3a5c10271"
         },
         "aWBTC2": {
             "address": "0xccF4429DB6322D5C611ee964527D42E5d685DD6a",
