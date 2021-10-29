@@ -21,10 +21,18 @@
         "BTCB": "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c",
         "aLINK": "0xCc7Fc8666F6e62cB44aa781de841eE6Be3BbE54c",
         "LINK": "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD",
+        "aADA": "0x219db7E6F8A609645E8559F8553A48C6e6b17f57",
+        "ADA": "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47",
+        "aDOT": "0x2C5056167cb2797a7D82996800F896D4F0684343",
+        "DOT": "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402",
+        "aCAKE": "0xd7C38eb724a4610A9fB78F3f9F6C400577e30AC2",
+        "CAKE": "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82",
         "Timelock": "0xd72BAE6AD60a6f4f3d3045510907CCE94520b03d",
         "GovernorAlpha": "0x0Ed46f84ebF8aF56Eb29644F6a49d184aD771E11",
         "AtlantisPriceOracle": "0x08f53B683e1B87d952a0878ce763c1E6F2F5B0d6",
-        "Base0bps_Slope1200bps_Jump2800bps_Kink80": "0xC2F02c119ACD716a55D55456df2f192C20235fBF"
+        "AtlantisChainLinkOracle": "0xC9B6D028c0BEeC6E50cEdbF18f2F28976Da402d0",
+        "Base0bps_Slope1200bps_Jump2800bps_Kink80": "0xC2F02c119ACD716a55D55456df2f192C20235fBF",
+        "Base260bps_Slope1200bps_Jump3000bps_Kink80": "0xC303D3AEAC1D5a0e7fF0040400931650E299245F"
        
     },
     "Blocks": {
@@ -43,10 +51,14 @@
         "aETH": 11933251,
         "aBTC": 11933349,
         "aLINK": 11933457,
+        "aADA": 12170333,
+        "aDOT": 12170459,
+        "aCAKE": 12170656,
         "Timelock": 0,
         "GovernorAlpha": 0,
         "AtlantisPriceOracle": 11932423,
-        "Base0bps_Slope1200bps_Jump2800bps_Kink80": 11932409
+        "Base0bps_Slope1200bps_Jump2800bps_Kink80": 11932409,
+        "Base260bps_Slope1200bps_Jump3000bps_Kink80": 12170057
     },
     "AtlantisLens": {
         "name": "AtlantisLens",
@@ -166,6 +178,36 @@
             "admin": "0x",
             "underlying": "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD",
             "contract": "ABep20Delegate"
+        },
+        "aADA": {
+            "name": "Atlantis ADA",
+            "symbol": "aADA",
+            "decimals": 8,
+            "address": "0x219db7E6F8A609645E8559F8553A48C6e6b17f57",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47",
+            "contract": "ABep20Delegate"
+        },
+        "aDOT": {
+            "name": "Atlantis DOT",
+            "symbol": "aDOT",
+            "decimals": 8,
+            "address": "0x2C5056167cb2797a7D82996800F896D4F0684343",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402",
+            "contract": "ABep20Delegate"
+        },
+        "aCAKE": {
+            "name": "Atlantis CAKE",
+            "symbol": "aCAKE",
+            "decimals": 8,
+            "address": "0xd7C38eb724a4610A9fB78F3f9F6C400577e30AC2",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82",
+            "contract": "ABep20Delegate"
         }
     },
     "InterestRateModel": {
@@ -177,6 +219,16 @@
             "base": "0",
             "slope": "120000000000000000",
             "jump": "2800000000000000000",
+            "kink": "800000000000000000"
+        },
+        "Base260bps_Slope1200bps_Jump3000bps_Kink80": {
+            "name": "Base260bps_Slope1200bps_Jump3000bps_Kink80",
+            "contract": "JumpRateModelV2",
+            "description": "JumpRateModelV2 baseRate=260000000000000000 multiplier=120000000000000000 jump=3000000000000000000 kink=800000000000000000",
+            "address": "0xC303D3AEAC1D5a0e7fF0040400931650E299245F",
+            "base": "260000000000000000",
+            "slope": "120000000000000000",
+            "jump": "3000000000000000000",
             "kink": "800000000000000000"
         }
     },

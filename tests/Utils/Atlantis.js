@@ -277,6 +277,14 @@ async function makePriceOracle(opts = {}) {
   }
 }
 
+async function makeChainlinkOracle(opts = {}) {
+  const {
+    root = saddle.account
+  } = opts || {};
+
+  return await deploy('MockV3Aggregator', [opts.decimals, opts.initialAnswer]);
+}
+
 async function makeToken(opts = {}) {
   const {
     root = saddle.account,
@@ -449,6 +457,7 @@ module.exports = {
   makeAToken,
   makeInterestRateModel,
   makePriceOracle,
+  makeChainlinkOracle,
   makeToken,
 
   balanceOf,
