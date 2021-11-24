@@ -1085,18 +1085,24 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
             Market storage market = markets[address(aToken)];
             require(market.isListed == true, "atlantis market is not listed");
 
-            if (atlantisSupplyState[address(aToken)].index == 0 && atlantisSupplyState[address(aToken)].block == 0) {
+            if (atlantisSupplyState[address(aToken)].index == 0) {
                 atlantisSupplyState[address(aToken)] = AtlantisMarketState({
                     index: atlantisInitialIndex,
                     block: safe32(getBlockNumber(), "block number exceeds 32 bits")
                 });
+            } else {
+                // Update block number to ensure extra interest is not accrued during the prior period
+                atlantisSupplyState[address(aToken)].block = safe32(getBlockNumber(), "block number exceeds 32 bits");
             }
 
-            if (atlantisBorrowState[address(aToken)].index == 0 && atlantisBorrowState[address(aToken)].block == 0) {
+            if (atlantisBorrowState[address(aToken)].index == 0) {
                 atlantisBorrowState[address(aToken)] = AtlantisMarketState({
                     index: atlantisInitialIndex,
                     block: safe32(getBlockNumber(), "block number exceeds 32 bits")
                 });
+            } else {
+                // Update block number to ensure extra interest is not accrued during the prior period
+                atlantisBorrowState[address(aToken)].block = safe32(getBlockNumber(), "block number exceeds 32 bits");
             }
         }
 
