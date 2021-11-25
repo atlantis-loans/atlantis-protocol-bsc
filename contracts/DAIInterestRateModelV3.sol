@@ -83,7 +83,7 @@ contract DAIInterestRateModelV3 is JumpRateModelV2 {
         return pot
             .dsr().sub(1e27)  // scaled 1e27 aka RAY, and includes an extra "ONE" before subraction
             .div(1e9) // descale to 1e18
-            .mul(15); // 15 seconds per block
+            .mul(3); // 3 seconds per block
     }
 
     /**
@@ -91,7 +91,7 @@ contract DAIInterestRateModelV3 is JumpRateModelV2 {
      */
     function poke() public {
         (uint duty, ) = jug.ilks("BNB-A");
-        uint stabilityFeePerBlock = duty.add(jug.base()).sub(1e27).mul(1e18).div(1e27).mul(15);
+        uint stabilityFeePerBlock = duty.add(jug.base()).sub(1e27).mul(1e18).div(1e27).mul(3);
 
         // We ensure the minimum borrow rate >= DSR / (1 - reserve factor)
         baseRatePerBlock = dsrPerBlock().mul(1e18).div(assumedOneMinusReserveFactorMantissa);

@@ -16,8 +16,8 @@ function utilizationRate(cash, borrows, reserves) {
 
 function baseRoofRateFn(dsr, duty, mkrBase, jump, kink, cash, borrows, reserves) {
   const assumedOneMinusReserveFactor = 0.95;
-  const stabilityFeePerBlock = (duty + mkrBase - 1) * 15;
-  const dsrPerBlock = (dsr - 1) * 15;
+  const stabilityFeePerBlock = (duty + mkrBase - 1) * 3;
+  const dsrPerBlock = (dsr - 1) * 3;
   const gapPerBlock = 0.04 / blocksPerYear;
   const jumpPerBlock = jump / blocksPerYear;
 
@@ -39,7 +39,7 @@ function baseRoofRateFn(dsr, duty, mkrBase, jump, kink, cash, borrows, reserves)
 }
 
 function daiSupplyRate(dsr, duty, mkrBase, jump, kink, cash, borrows, reserves, reserveFactor = 0.1) {
-  const dsrPerBlock = (dsr - 1) * 15;
+  const dsrPerBlock = (dsr - 1) * 3;
   const ur = utilizationRate(cash, borrows, reserves);
   const borrowRate = baseRoofRateFn(dsr, duty, mkrBase, jump, kink, cash, borrows, reserves);
   const underlying = cash + borrows - reserves;
