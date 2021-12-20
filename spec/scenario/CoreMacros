@@ -253,3 +253,4 @@ Macro BorrowAndRepayEthWithInterest aBNB amount interestAmount interestRate bloc
     RepayBorrowEth Torrey amount aBNB
     RepayBorrowEth Torrey interestAmount aBNB
     Assert Equal (AToken aBNB BorrowBalance Torrey) Zero
+

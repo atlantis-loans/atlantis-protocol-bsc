@@ -17,6 +17,7 @@ import { InterestRateModel } from './Contract/InterestRateModel';
 import { PriceOracle } from './Contract/PriceOracle';
 import { Timelock } from './Contract/Timelock';
 import { AnchoredView } from './Contract/AnchoredView';
+import { CommunityVaultImpl, CommunityVaultProxy, CommunityVault } from './Contract/CommunityVault';
 
 type ContractDataEl = string | Map<string, object> | undefined;
 
@@ -112,6 +113,18 @@ export function getGovernorAddress(world: World, governorArg: string): string {
 
 export function getGovernorBravo(world: World, governoBravoArg: string): Promise<GovernorBravo> {
   return getWorldContract(world, [['Contracts', 'GovernorBravo']])
+}
+
+export function getCommunityVault(world: World): Promise<CommunityVault> {
+  return getWorldContract(world, [['Contracts', 'CommunityVault']])
+}
+
+export function getCommunityVaultProxy(world: World): Promise<CommunityVaultProxy> {
+  return getWorldContract(world, [['Contracts', 'CommunityVaultProxy']])
+}
+
+export async function getCommunityVaultImpl(world: World, communityVaultImplArg: Event): Promise<CommunityVaultImpl> {
+  return getWorldContract(world, [['CommunityVault', mustString(communityVaultImplArg), 'address']]);
 }
 
 export async function getPriceOracleProxy(world: World): Promise<PriceOracle> {

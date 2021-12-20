@@ -26,6 +26,9 @@ import { invariantCommands, processInvariantEvent } from './Event/InvariantEvent
 import { expectationCommands, processExpectationEvent } from './Event/ExpectationEvent';
 import { timelockCommands, processTimelockEvent } from './Event/TimelockEvent';
 import { atlantisCommands, processAtlantisEvent } from './Event/AtlantisEvent';
+import { communityVaultCommands, processCommunityVaultEvent } from './Event/CommunityVaultEvent';
+import { communityVaultImplCommands, processCommunityVaultImplEvent } from './Event/CommunityVaultImplEvent';
+import { communityVaultProxyCommands, processCommunityVaultProxyEvent } from './Event/CommunityVaultProxyEvent';
 import { governorCommands, processGovernorEvent } from './Event/GovernorEvent';
 import { governorBravoCommands, processGovernorBravoEvent } from './Event/GovernorBravoEvent';
 import { processTrxEvent, trxCommands } from './Event/TrxEvent';
@@ -42,7 +45,7 @@ import { buildContractEvent } from './EventBuilder';
 import { Counter } from './Contract/Counter';
 import { AtlantisLens } from './Contract/AtlantisLens';
 import { Reservoir } from './Contract/Reservoir';
-import Web3 from 'web3';
+import { CommunityStore } from './Contract/CommunityVault';
 
 export class EventProcessingError extends Error {
   error: Error;
@@ -797,6 +800,48 @@ export const commands: (View<any> | ((world: World) => Promise<View<any>>))[] = 
 
   new Command<{ event: EventV }>(
     `
+      #### CommunityVault
+      * "CommunityVault ...event" - Runs given Community Vault event
+      * E.g. "CommunityVault Deploy"
+    `,
+    'CommunityVault',
+    [new Arg('event', getEventV, { variadic: true })],
+    (world, from, { event }) => {
+      return processCommunityVaultEvent(world, event.val, from);
+    },
+    { subExpressions: communityVaultCommands() }
+  ),
+
+  new Command<{ event: EventV }>(
+    `
+      #### CommunityVaultImpl
+      * "CommunityVaultImpl ...event" - Runs given Community Vault implementation event
+      * E.g. "CommunityVaultImpl Deploy MyVaultImpl"
+    `,
+    'CommunityVaultImpl',
+    [new Arg('event', getEventV, { variadic: true })],
+    (world, from, { event }) => {
+      return processCommunityVaultImplEvent(world, event.val, from);
+    },
+    { subExpressions: communityVaultImplCommands() }
+  ),
+
+  new Command<{ event: EventV }>(
+    `
+      #### CommunityVaultProxy
+      * "CommunityVaultProxy ...event" - Runs given Community Vault proxy event
+      * E.g. "CommunityVaultProxy Deploy"
+    `,
+    'CommunityVaultProxy',
+    [new Arg('event', getEventV, { variadic: true })],
+    (world, from, { event }) => {
+      return processCommunityVaultProxyEvent(world, event.val, from);
+    },
+    { subExpressions: communityVaultProxyCommands() }
+  ),
+
+  new Command<{ event: EventV }>(
+    `
       #### Governor
 
       * "Governor ...event" - Runs given governor event
@@ -828,6 +873,7 @@ export const commands: (View<any> | ((world: World) => Promise<View<any>>))[] = 
   buildContractEvent<Counter>("Counter", false),
   buildContractEvent<AtlantisLens>("AtlantisLens", false),
   buildContractEvent<Reservoir>("Reservoir", true),
+  buildContractEvent<CommunityStore>("CommunityStore", true),
 
   new View<{ event: EventV }>(
     `

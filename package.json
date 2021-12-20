@@ -13,7 +13,8 @@
     "profile": "yarn test tests/gasProfiler.js",
     "report": "npx run ./script/saddle/gasReport.js",
     "test": "./script/test",
-    "test:file": "./script/test -- tests/AtlantisChainlinkOracleTest.js --runTestsByPath true",
+    "test:file": "./script/test -- tests/Scenarios/Governor/*ScenTest.js --runTestsByPath true",
+    "test:file1": "./script/test -- tests/CommunityVault/communityVaultTest.js --runTestsByPath true",
     "test:prepare": "NO_RUN=true ./script/test",
     "checksize": "npx run ./script/saddle/comptrollerSize.js"
   },

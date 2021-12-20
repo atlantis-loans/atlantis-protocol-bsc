@@ -2,16 +2,35 @@ const {
   address,
   etherMantissa,
   encodeParameters,
-  mineBlock
+  mineBlock,
+  etherUnsigned
 } = require('../../Utils/Ethereum');
 
 describe('GovernorAlpha#propose/5', () => {
-  let gov, root, acct;
+  let gov, root, acct, atlantis, atlantisVault;
+    
+  async function enfranchise(actor, amount) {
+    await send(atlantisVault, 'delegate', [actor], { from: actor });
+    await send(atlantis, 'approve', [atlantisVault._address, etherMantissa(1e10)], { from: actor });
+    // in test cases, we transfer enough token to actor for convenience
+    await send(atlantis, 'transfer', [actor, etherMantissa(amount)]);
+    await send(atlantisVault, 'deposit', [atlantis._address, 0, etherMantissa(amount)], { from: actor });
+  }
 
   beforeAll(async () => {
     [root, acct, ...accounts] = accounts;
+    
+    atlantisVault = await deploy('CommunityVault', []);
+    communityStore = await deploy('CommunityStore', []);
     atlantis = await deploy('Atlantis', [root]);
-    gov = await deploy('GovernorAlpha', [address(0), atlantis._address, address(0)]);
+
+    await send(communityStore, 'setNewOwner', [atlantisVault._address], { from: root });
+    await send(atlantisVault, 'setCommunityStore', [atlantis._address, communityStore._address], { from: root });
+    // address _rewardToken, uint256 _allocPoint, IBEP20 _token, uint256 _rewardPerBlock, uint256 _lockPeriod
+    await send(atlantisVault, 'add', [atlantis._address, 100, atlantis._address, etherUnsigned(1e16), 300], { from: root }); // lock period 300s
+    await send(atlantisVault, 'delegate', [root]);
+
+    gov = await deploy('GovernorAlpha', [address(0), atlantisVault._address, root]);
   });
 
   let trivialProposal, targets, values, signatures, callDatas;
@@ -23,7 +42,7 @@ describe('GovernorAlpha#propose/5', () => {
     values = ["0"];
     signatures = ["getBalanceOf(address)"];
     callDatas = [encodeParameters(['address'], [acct])];
-    await send(atlantis, 'delegate', [root]);
+    await enfranchise(root, 400000);
     await send(gov, 'propose', [targets, values, signatures, callDatas, "do nothing"]);
     proposalBlock = +(await web3.eth.getBlockNumber());
     proposalId = await call(gov, 'latestProposalIds', [root]);
@@ -123,8 +142,7 @@ describe('GovernorAlpha#propose/5', () => {
     });
 
     it("This function returns the id of the newly created proposal. # proposalId(n) = succ(proposalId(n-1))", async () => {
-      await send(atlantis, 'transfer', [accounts[2], etherMantissa(400001)]);
-      await send(atlantis, 'delegate', [accounts[2]], { from: accounts[2] });
+      await enfranchise(accounts[2], 400001);
 
       await mineBlock();
       let nextProposalId = await gov.methods['propose'](targets, values, signatures, callDatas, "yoot").call({ from: accounts[2] });
@@ -134,8 +152,8 @@ describe('GovernorAlpha#propose/5', () => {
     });
 
     it("emits log with id and description", async () => {
-      await send(atlantis, 'transfer', [accounts[3], etherMantissa(400001)]);
-      await send(atlantis, 'delegate', [accounts[3]], { from: accounts[3] });
+      await enfranchise(accounts[3], 400001);
+
       await mineBlock();
       let nextProposalId = await gov.methods['propose'](targets, values, signatures, callDatas, "yoot").call({ from: accounts[3] });
 
@@ -147,8 +165,8 @@ describe('GovernorAlpha#propose/5', () => {
         values: values,
         signatures: signatures,
         calldatas: callDatas,
-        startBlock: 13 + votingDelay,
-        endBlock: 13 + votingDelay + votingPeriod,
+        startBlock: 26 + votingDelay,
+        endBlock: 26 + votingDelay + votingPeriod,
         description: "second proposal",
         proposer: accounts[3]
       });

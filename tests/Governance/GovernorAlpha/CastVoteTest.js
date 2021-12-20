@@ -3,39 +3,53 @@ const {
   etherMantissa,
   encodeParameters,
   mineBlock,
-  unlockedAccount
+  unlockedAccount,
+  etherUnsigned
 } = require('../../Utils/Ethereum');
 const EIP712 = require('../../Utils/EIP712');
 const BigNumber = require('bignumber.js');
 const chalk = require('chalk');
 
-async function enfranchise(atlantis, actor, amount) {
-  await send(atlantis, 'transfer', [actor, etherMantissa(amount)]);
-  await send(atlantis, 'delegate', [actor], { from: actor });
-}
-
 describe("governorAlpha#castVote/2", () => {
-  let atlantis, gov, root, a1, accounts;
+  let atlantis, gov, root, a1, accounts, atlantisVault;
   let targets, values, signatures, callDatas, proposalId;
+
+  async function enfranchise(actor, amount) {
+    await send(atlantisVault, 'delegate', [actor], { from: actor });
+    await send(atlantis, 'approve', [atlantisVault._address, etherMantissa(1e10)], { from: actor });
+    // in test cases, we transfer enough token to actor for convenience
+    await send(atlantis, 'transfer', [actor, etherMantissa(amount)]);
+    await send(atlantisVault, 'deposit', [atlantis._address, 0, etherMantissa(amount)], { from: actor });
+  }
 
   beforeAll(async () => {
     [root, a1, ...accounts] = saddle.accounts;
-    atlantis = await deploy('Atlantis', [root]);
-    gov = await deploy('GovernorAlpha', [address(0), atlantis._address, root]);
+
+    atlantisVault = await deploy('CommunityVault', []);
+    communityStore = await deploy('CommunityStore', []);
+    atlantis = await deploy('AtlantisScenario', [root]);
+
+    await send(communityStore, 'setNewOwner', [atlantisVault._address], { from: root });
+    await send(atlantisVault, 'setCommunityStore', [atlantis._address, communityStore._address], { from: root });
+    // address _rewardToken, uint256 _allocPoint, IBEP20 _token, uint256 _rewardPerBlock, uint256 _lockPeriod
+    await send(atlantisVault, 'add', [atlantis._address, 100, atlantis._address, etherUnsigned(1e16), 300], { from: root }); // lock period 300s
+    await send(atlantisVault, 'delegate', [root]);
+
+    gov = await deploy('GovernorAlpha', [address(0), atlantisVault._address, root]);
 
     targets = [a1];
     values = ["0"];
     signatures = ["getBalanceOf(address)"];
     callDatas = [encodeParameters(['address'], [a1])];
-    await send(atlantis, 'delegate', [root]);
+
+    await enfranchise(root, 400001)
     await send(gov, 'propose', [targets, values, signatures, callDatas, "do nothing"]);
     proposalId = await call(gov, 'latestProposalIds', [root]);
   });
 
   describe("We must revert if:", () => {
     it("There does not exist a proposal with matching proposal id where the current block number is between the proposal's start block (exclusive) and end block (inclusive)", async () => {
-      await expect(
-        call(gov, 'castVote', [proposalId, true])
+      await expect(call(gov, 'castVote', [proposalId, true])
       ).rejects.toRevert("revert GovernorAlpha::_castVote: voting is closed");
     });
 
@@ -52,9 +66,9 @@ describe("governorAlpha#castVote/2", () => {
 
   describe("Otherwise", () => {
     it("we add the sender to the proposal's voters set", async () => {
-      await expect(call(gov, 'getReceipt', [proposalId, accounts[2]])).resolves.toPartEqual({hasVoted: false});
+      await expect(call(gov, 'getReceipt', [proposalId, accounts[2]])).resolves.toPartEqual({ hasVoted: false });
       await send(gov, 'castVote', [proposalId, true], { from: accounts[2] });
-      await expect(call(gov, 'getReceipt', [proposalId, accounts[2]])).resolves.toPartEqual({hasVoted: true});
+      await expect(call(gov, 'getReceipt', [proposalId, accounts[2]])).resolves.toPartEqual({ hasVoted: true });
     });
 
     describe("and we take the balance returned by GetPriorVotes for the given sender and the proposal's start block, which may be zero,", () => {
@@ -62,7 +76,7 @@ describe("governorAlpha#castVote/2", () => {
 
       it("and we add that ForVotes", async () => {
         actor = accounts[1];
-        await enfranchise(atlantis, actor, 400001);
+        await enfranchise(actor, 400001);
 
         await send(gov, 'propose', [targets, values, signatures, callDatas, "do nothing"], { from: actor });
         proposalId = await call(gov, 'latestProposalIds', [actor]);
@@ -77,7 +91,7 @@ describe("governorAlpha#castVote/2", () => {
 
       it("or AgainstVotes corresponding to the caller's support flag.", async () => {
         actor = accounts[3];
-        await enfranchise(atlantis, actor, 400001);
+        await enfranchise(actor, 400001);
 
         await send(gov, 'propose', [targets, values, signatures, callDatas, "do nothing"], { from: actor });
         proposalId = await call(gov, 'latestProposalIds', [actor]);;
@@ -109,7 +123,7 @@ describe("governorAlpha#castVote/2", () => {
       });
 
       it('casts vote on behalf of the signatory', async () => {
-        await enfranchise(atlantis, a1, 400001);
+        await enfranchise(a1, 400001);
         await send(gov, 'propose', [targets, values, signatures, callDatas, "do nothing"], { from: a1 });
         proposalId = await call(gov, 'latestProposalIds', [a1]);;
 
@@ -128,8 +142,8 @@ describe("governorAlpha#castVote/2", () => {
     it("receipt uses one load", async () => {
       let actor = accounts[2];
       let actor2 = accounts[3];
-      await enfranchise(atlantis, actor, 400001);
-      await enfranchise(atlantis, actor2, 400001);
+      await enfranchise(actor, 400001);
+      await enfranchise(actor2, 400001);
       await send(gov, 'propose', [targets, values, signatures, callDatas, "do nothing"], { from: actor });
       proposalId = await call(gov, 'latestProposalIds', [actor]);
 
@@ -145,8 +159,8 @@ describe("governorAlpha#castVote/2", () => {
         constants: {
           "account": actor
         },
-        preFilter: ({op}) => op === 'SLOAD',
-        postFilter: ({source}) => !source || source.includes('receipts'),
+        preFilter: ({ op }) => op === 'SLOAD',
+        postFilter: ({ source }) => !source || source.includes('receipts'),
         execLog: (log) => {
           let [output] = log.outputs;
           let votes = "000000000000000000000000000000000000000054b419003bdf81640000";
@@ -166,8 +180,8 @@ describe("governorAlpha#castVote/2", () => {
         constants: {
           "account": actor2
         },
-        preFilter: ({op}) => op === 'SLOAD',
-        postFilter: ({source}) => !source || source.includes('receipts'),
+        preFilter: ({ op }) => op === 'SLOAD',
+        postFilter: ({ source }) => !source || source.includes('receipts'),
         execLog: (log) => {
           let [output] = log.outputs;
           let votes = "0000000000000000000000000000000000000000a968320077bf02c80000";

@@ -25,28 +25,28 @@ export async function buildGovernor(
 ): Promise<{ world: World; governor: Governor; govData: GovernorData }> {
   const fetchers = [
     new Fetcher<
-      { name: StringV, timelock: AddressV, atlantis: AddressV, guardian: AddressV },
+      { name: StringV, timelock: AddressV, communityVault: AddressV, guardian: AddressV },
       GovernorData
     >(
       `
       #### GovernorAlpha
 
-      * "Governor Deploy Alpha name:<String> timelock:<Address> atlantis:<Address> guardian:<Address>" - Deploys Atlantis Governor Alpha
-        * E.g. "Governor Deploy Alpha GovernorAlpha (Address Timelock) (Address Atlantis) Guardian"
+      * "Governor Deploy Alpha name:<String> timelock:<Address> communityVault:<Address> guardian:<Address>" - Deploys Atlantis Governor Alpha
+        * E.g. "Governor Deploy Alpha GovernorAlpha (Address Timelock) (Address CommunityVault) Guardian"
     `,
       "Alpha",
       [
         new Arg("name", getStringV),
         new Arg("timelock", getAddressV),
-        new Arg("atlantis", getAddressV),
+        new Arg("communityVault", getAddressV),
         new Arg("guardian", getAddressV)
       ],
-      async (world, { name, timelock, atlantis, guardian }) => {
+      async (world, { name, timelock, communityVault, guardian }) => {
         return {
           invokation: await GovernorAlphaContract.deploy<Governor>(
             world,
             from,
-            [timelock.val, atlantis.val, guardian.val]
+            [timelock.val, communityVault.val, guardian.val]
           ),
           name: name.val,
           contract: "GovernorAlpha"
@@ -54,28 +54,28 @@ export async function buildGovernor(
       }
     ),
     new Fetcher<
-      { name: StringV, timelock: AddressV, atlantis: AddressV, guardian: AddressV},
+      { name: StringV, timelock: AddressV, communityVault: AddressV, guardian: AddressV},
       GovernorData
     >(
       `
       #### GovernorAlphaHarness
 
-      * "Governor Deploy AlphaHarness name:<String> timelock:<Address> atlantis:<Address> guardian:<Address>" - Deploys Atlantis Governor Alpha with a mocked voting period
-        * E.g. "Governor Deploy AlphaHarness GovernorAlphaHarness (Address Timelock) (Address Atlantis) Guardian"
+      * "Governor Deploy AlphaHarness name:<String> timelock:<Address> communityVault:<Address> guardian:<Address>" - Deploys Atlantis Governor Alpha with a mocked voting period
+        * E.g. "Governor Deploy AlphaHarness GovernorAlphaHarness (Address Timelock) (Address CommunityVault) Guardian"
     `,
       "AlphaHarness",
       [
         new Arg("name", getStringV),
         new Arg("timelock", getAddressV),
-        new Arg("atlantis", getAddressV),
+        new Arg("communityVault", getAddressV),
         new Arg("guardian", getAddressV)
       ],
-      async (world, { name, timelock, atlantis, guardian }) => {
+      async (world, { name, timelock, communityVault, guardian }) => {
         return {
           invokation: await GovernorAlphaHarnessContract.deploy<Governor>(
             world,
             from,
-            [timelock.val, atlantis.val, guardian.val]
+            [timelock.val, communityVault.val, guardian.val]
           ),
           name: name.val,
           contract: "GovernorAlphaHarness"

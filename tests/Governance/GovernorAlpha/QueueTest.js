@@ -4,16 +4,30 @@ const {
   encodeParameters,
   advanceBlocks,
   freezeTime,
-  mineBlock
+  mineBlock,
+  etherUnsigned
 } = require('../../Utils/Ethereum');
-
-async function enfranchise(atlantis, actor, amount) {
-  await send(atlantis, 'transfer', [actor, etherMantissa(amount)]);
-  await send(atlantis, 'delegate', [actor], {from: actor});
-}
 
 describe('GovernorAlpha#queue/1', () => {
   let root, a1, a2, accounts;
+
+  async function enfranchise(atlantis, atlantisVault, actor, amount) {
+    await send(atlantisVault, 'delegate', [actor], { from: actor });
+    await send(atlantis, 'approve', [atlantisVault._address, etherMantissa(1e10)], { from: actor });
+    // in test cases, we transfer enough token to actor for convenience
+    await send(atlantis, 'transfer', [actor, etherMantissa(amount)]);
+    await send(atlantisVault, 'deposit', [atlantis._address, 0, etherMantissa(amount)], { from: actor });
+  }
+
+  async function makeVault(atlantis, actor) {
+    const atlantisVault = await deploy('CommunityVault', []);
+    const communityStore = await deploy('CommunityStore', []);
+    await send(communityStore, 'setNewOwner', [atlantisVault._address], { from: actor });
+    await send(atlantisVault, 'setCommunityStore', [atlantis._address, communityStore._address], { from: actor });
+    await send(atlantisVault, 'add', [atlantis._address, 100, atlantis._address, etherUnsigned(1e16), 300], { from: actor }); // lock period 300s
+    return atlantisVault;
+  }
+
   beforeAll(async () => {
     [root, a1, a2, ...accounts] = saddle.accounts;
   });
@@ -22,10 +36,11 @@ describe('GovernorAlpha#queue/1', () => {
     it("reverts on queueing overlapping actions in same proposal", async () => {
       const timelock = await deploy('TimelockHarness', [root, 86400 * 2]);
       const atlantis = await deploy('Atlantis', [root]);
-      const gov = await deploy('GovernorAlpha', [timelock._address, atlantis._address, root]);
+      const atlantisVault = await makeVault(atlantis, root);
+      const gov = await deploy('GovernorAlpha', [timelock._address, atlantisVault._address, root]);
       const txAdmin = await send(timelock, 'harnessSetAdmin', [gov._address]);
 
-      await enfranchise(atlantis, a1, 3e6);
+      await enfranchise(atlantis, atlantisVault, a1, 3e6);
       await mineBlock();
 
       const targets = [atlantis._address, atlantis._address];
@@ -46,11 +61,12 @@ describe('GovernorAlpha#queue/1', () => {
     it("reverts on queueing overlapping actions in different proposals, works if waiting", async () => {
       const timelock = await deploy('TimelockHarness', [root, 86400 * 2]);
       const atlantis = await deploy('Atlantis', [root]);
-      const gov = await deploy('GovernorAlpha', [timelock._address, atlantis._address, root]);
+      const atlantisVault = await makeVault(atlantis, root);
+      const gov = await deploy('GovernorAlpha', [timelock._address, atlantisVault._address, root]);
       const txAdmin = await send(timelock, 'harnessSetAdmin', [gov._address]);
 
-      await enfranchise(atlantis, a1, 3e6);
-      await enfranchise(atlantis, a2, 3e6);
+      await enfranchise(atlantis, atlantisVault, a1, 3e6);
+      await enfranchise(atlantis, atlantisVault, a2, 3e6);
       await mineBlock();
 
       const targets = [atlantis._address];
