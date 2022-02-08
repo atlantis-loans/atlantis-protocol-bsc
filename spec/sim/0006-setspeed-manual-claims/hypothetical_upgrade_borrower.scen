@@ -25,10 +25,10 @@ From USDCWhale (Trx GasPrice 0 (AToken aUSDC Mint 10000e6))
 -- Baseline Atlantis claim speed
 Assert Equal (Comptroller CheckIsComped aDAI) True
 
-Comptroller ClaimAtl BigBorrower
+Comptroller ClaimAtlantis BigBorrower
 AdvanceBlocks 1000
 Expect Changes (Bep20 Atlantis TokenBalance BigBorrower) 2.893496802261224189e18
-Comptroller ClaimAtl BigBorrower
+Comptroller ClaimAtlantis BigBorrower
 
 -- Propose to apply the patch
 
@@ -45,9 +45,9 @@ IncreaseTime 604910
 Governor GovernorAlpha Proposal LastProposal Execute
 ComptrollerImpl ComptrollerG7 MergeABI
 
-Comptroller ClaimAtl BigBorrower
+Comptroller ClaimAtlantis BigBorrower
 AdvanceBlocks 1000
 Expect Changes (Bep20 Atlantis TokenBalance BigBorrower) 2.893496802261224189e18
-Comptroller ClaimAtl BigBorrower
+Comptroller ClaimAtlantis BigBorrower
 
 Print "Upgrade OK!"

@@ -37,35 +37,37 @@ contract ComptrollerScenario is Comptroller {
         markets[address(aToken)].isListed = false;
     }
 
-    /**
-     * @notice Recalculate and update Atlantis speeds for all Atlantis markets
-     */
+    function setAtlantisBorrowerIndex(address aToken, address borrower, uint index) public {
+        atlantisBorrowerIndex[aToken][borrower] = index;
+    }
+
+    function setAtlantisSupplierIndex(address aToken, address supplier, uint index) public {
+        atlantisSupplierIndex[aToken][supplier] = index;
+    }
+
     function refreshAtlantisSpeeds() public {
         AToken[] memory allMarkets_ = allMarkets;
-
         for (uint i = 0; i < allMarkets_.length; i++) {
             AToken aToken = allMarkets_[i];
             Exp memory borrowIndex = Exp({mantissa: aToken.borrowIndex()});
             updateAtlantisSupplyIndex(address(aToken));
             updateAtlantisBorrowIndex(address(aToken), borrowIndex);
         }
-
         Exp memory totalUtility = Exp({mantissa: 0});
         Exp[] memory utilities = new Exp[](allMarkets_.length);
         for (uint i = 0; i < allMarkets_.length; i++) {
             AToken aToken = allMarkets_[i];
-            if (atlantisSpeeds[address(aToken)] > 0) {
+            if (atlantisSupplySpeeds[address(aToken)] > 0 || atlantisBorrowSpeeds[address(aToken)] > 0) {
                 Exp memory assetPrice = Exp({mantissa: oracle.getUnderlyingPrice(aToken)});
                 Exp memory utility = mul_(assetPrice, aToken.totalBorrows());
                 utilities[i] = utility;
                 totalUtility = add_(totalUtility, utility);
             }
         }
-
         for (uint i = 0; i < allMarkets_.length; i++) {
             AToken aToken = allMarkets[i];
             uint newSpeed = totalUtility.mantissa > 0 ? mul_(atlantisRate, div_(utilities[i], totalUtility)) : 0;
-            setAtlantisSpeedInternal(aToken, newSpeed);
+            setAtlantisSpeedInternal(aToken, newSpeed, newSpeed);
         }
     }
 }

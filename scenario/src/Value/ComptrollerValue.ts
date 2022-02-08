@@ -547,6 +547,32 @@ export function comptrollerFetchers() {
         return new NumberV(await comptroller.methods.atlantisSpeeds(AToken._address).call());
       }
     ),
+    new Fetcher<{comptroller: Comptroller, AToken: AToken}, NumberV>(`
+        #### AtlantisSupplySpeed
+        * "Comptroller AtlantisSupplySpeed aZRX
+      `,
+      "AtlantisSupplySpeed",
+      [
+        new Arg("comptroller", getComptroller, {implicit: true}),
+        new Arg("AToken", getATokenV),
+      ],
+      async (world, {comptroller, AToken}) => {
+        return new NumberV(await comptroller.methods.atlantisSupplySpeeds(AToken._address).call());
+      }
+    ),
+    new Fetcher<{comptroller: Comptroller, AToken: AToken}, NumberV>(`
+        #### atlantisBorrowSpeed
+        * "Comptroller atlantisBorrowSpeed aZRX
+      `,
+      "atlantisBorrowSpeed",
+      [
+        new Arg("comptroller", getComptroller, {implicit: true}),
+        new Arg("AToken", getATokenV),
+      ],
+      async (world, {comptroller, AToken}) => {
+        return new NumberV(await comptroller.methods.atlantisBorrowSpeeds(AToken._address).call());
+      }
+    ),
     new Fetcher<{comptroller: Comptroller}, AddressV>(`
         #### BorrowCapGuardian
 

@@ -50,7 +50,7 @@ AdvanceBlocks 1000
 
 -- Check contributor claim amount is added
 From Tarun (Comptroller UpdateContributorRewards Tarun)
-From Tarun (Comptroller ClaimAtl Tarun)
+From Tarun (Comptroller ClaimAtlantis Tarun)
 
 -- Initial run            15000  = (997+3)*15
 -- Second proposal mining 300000 = 20000*15
@@ -75,7 +75,7 @@ AdvanceBlocks 10000
 
 -- Check no more Atlantis was allocated
 From Tarun (Comptroller UpdateContributorRewards Tarun)
-From Tarun (Comptroller ClaimAtl Tarun)
+From Tarun (Comptroller ClaimAtlantis Tarun)
 -- Initial value          320085
 -- Third proposal mining  100000 = 20000*5
 -- Extra blocks           0 = 1000*0

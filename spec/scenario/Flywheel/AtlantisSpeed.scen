@@ -1,95 +1,231 @@
--- Tests for the grants and math patch
+-- Tests setting Atlantis (borrow/supply) speeds work properly
+-- Ensures setting various Atlantis speeds doesn't break the Atlantis distribution mechanisms
+-- Note: Ensuring the right amounts of Atlantis distributed is out of scope of these scenario tests (this is in the scope of flywheel scenario tests)
 
-Macro FlywheelComptroller price=1.0 borrowRate=0.000005 atlantisInitAmount=5000000e18
+Macro FlywheelComptroller price=1.0 atlantisInitAmount=5000000e18
     Unitroller Deploy
     PriceOracle Deploy Fixed price
     PriceOracleProxy Deploy Admin (PriceOracle Address) (Address Zero) (Address Zero) (Address Zero) (Address Zero) (Address Zero)
-    ----g2
-    ComptrollerImpl Deploy ScenarioG2 ComptrollerScenG2
-    Unitroller SetPendingImpl ComptrollerScenG2
-    ComptrollerImpl ComptrollerScenG2 BecomeG2
-    --list some tokens
+    -- Deploy Comptroller
+    ComptrollerImpl Deploy Scenario ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen Become
+    -- Configure Comptroller
     Comptroller SetPriceOracle (PriceOracleProxy Address)
-    Comptroller SetMaxAssets 20
     Comptroller SetCloseFactor 0.5
     Comptroller LiquidationIncentive 1.1
+    -- Add markets
     NewAToken ZRX aZRX
     NewAToken BAT aBAT
     Support aZRX collateralFactor:0.5
     Support aBAT collateralFactor:0.5
-    -- final
-    ComptrollerImpl Deploy ScenarioG3 ComptrollerScen
-    Unitroller SetPendingImpl ComptrollerScen
-    ComptrollerImpl ComptrollerScen BecomeG3 1e18 [aZRX aBAT]
+    -- Setup Atlantis token
     Bep20 Deploy Standard Atlantis "Atlantis Token" 18
     Give (Address Comptroller) atlantisInitAmount Atlantis
+    Comptroller Send "setAtlantisAddress(address)" (Address Atlantis)
 
-Macro GrantsComptroller
-    FlywheelComptroller
-    -- g4
-    ComptrollerImpl Deploy ScenarioG4 ComptrollerScen
-    Unitroller SetPendingImpl ComptrollerScen
-    ComptrollerImpl ComptrollerScen BecomeG4
-    -- g5
-    ComptrollerImpl Deploy ScenarioG5 ComptrollerScen
-    Unitroller SetPendingImpl ComptrollerScen
-    ComptrollerImpl ComptrollerScen BecomeG5
-    -- current
-    ComptrollerImpl Deploy Scenario ComptrollerScen
-    Unitroller SetPendingImpl ComptrollerScen
-    ComptrollerImpl ComptrollerScen Become
-
-Macro InitSpeeds
+Macro InitUsage
     Prep Geoff 100e18 ZRX aZRX
     Mint Geoff 50e18 aZRX--tokenbalance = 50e18 / 2e9 = 2.5e10
     Prep Coburn Some BAT aBAT
     Mint Coburn 6e18 aBAT--tokenbalance = 6e18 / 2e9 = 3e9
     EnterMarkets Coburn aBAT
     Borrow Coburn 1e18 aZRX
-    Comptroller SetAtlantisSpeed aZRX 1
-    Comptroller SetAtlantisSpeed aBAT 1
-    Comptroller RefreshAtlantisSpeeds
-    Comptroller Send "setAtlantisAddress(address)" (Address Atlantis)
 
-Test "Atlantis speed can be set per market"
-    GrantsComptroller
-    InitSpeeds
-    -- Baseline atlantis amounts
-    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
-    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 0
-    -- Atlantis speed can be set
-    Comptroller SetAtlantisSpeed aZRX 2
-    FastForward 1000 Blocks
-    Comptroller ClaimAtl Geoff
-    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
-    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 2000
-    -- Atlantis speed can be changed
-    Comptroller SetAtlantisSpeed aZRX 4
-    FastForward 1000 Blocks
-    Comptroller ClaimAtl Geoff
-    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
-    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 6000
-    -- Atlantis speed can be removed
-    Comptroller SetAtlantisSpeed aZRX 0
-    FastForward 1000 Blocks
-    Comptroller ClaimAtl Geoff
-    Assert Equal (Comptroller AtlantisAccrued Geoff) 0
-    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 6000
+Macro UseEnvironment1
+    FlywheelComptroller
+    InitUsage
 
-Test "Set atlantis rate is removed"
-    GrantsComptroller
-    InitSpeeds
-    AllowFailures
-    Comptroller SetAtlantisRate 5
+Macro ClaimAtlantisForAll
+    Comptroller ClaimAtlantis Geoff
+    Comptroller ClaimAtlantis Coburn
 
-Test "Atlantis is not claimed automatically"
-    GrantsComptroller
-    InitSpeeds
-    Comptroller SetAtlantisSpeed aZRX 2
-    FastForward 100000 Blocks
-    -- Check atlantis is not claimed automatically
-    Mint Geoff 50e18 aZRX
-    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 0
-    -- Confirm there was atlantis to claim
-    Comptroller ClaimAtl Geoff
-    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 200000
+Macro VerifyAtlantisSpeeds aToken supplySpeed borrowSpeed
+    Assert Equal (Comptroller AtlantisSupplySpeed aToken) supplySpeed
+    Assert Equal (Comptroller AtlantisBorrowSpeed aToken) borrowSpeed
+
+Macro SetAndVerifyAtlantisSpeeds aToken supplySpeed borrowSpeed
+    Comptroller SetAtlantisSpeeds (aToken) ((Number supplySpeed)) ((Number borrowSpeed))
+    VerifyAtlantisSpeeds aToken supplySpeed borrowSpeed
+    MineBlock -- Ensures we accrue Atlantis
+    ClaimAtlantisForAll -- Ensures setting the Atlantis speeds didn't break the distribution mechanisms
+
+Test "Atlantis supply speed can be set"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 0e18
+
+Test "Atlantis supply speed can be set then unset"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 0e18
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 0e18
+
+Test "Atlantis supply speed can be set then set again"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 0e18
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 0e18
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 0e18
+
+Test "Atlantis supply speed can be set w/ borrow speed"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 1e18
+
+Test "Atlantis supply speed can be set then unset w/ borrow speed"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 1e18
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 1e18
+
+Test "Atlantis supply speed can be set then set, unset, and set again w/ borrow speed"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 1e18
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 1e18
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 1e18
+
+Test "Atlantis borrow speed can be set"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 2e18
+
+Test "Atlantis borrow speed can be set then unset"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 2e18
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 0e18
+
+Test "Atlantis borrow speed can be set then set again"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 2e18
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 0e18
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 2e18
+
+Test "Atlantis borrow speed can be set w/ supply speed"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 2e18
+
+Test "Atlantis borrow speed can be set then unset w/ supply speed"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 2e18
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 0e18
+
+Test "Atlantis borrow speed can be set then set, unset, and set again w/ supply speed"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 2e18
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 0e18
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 2e18
+
+Test "Many different Atlantis supply speeds can be set"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 0e18
+    SetAndVerifyAtlantisSpeeds aBAT 3e18 0e18
+    VerifyAtlantisSpeeds aZRX 2e18 0e18 -- Ensure these speeds weren't changed
+
+Test "Many different Atlantis supply speeds can be set then unset"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 0e18
+    SetAndVerifyAtlantisSpeeds aBAT 3e18 0e18
+    VerifyAtlantisSpeeds aZRX 2e18 0e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 0e18 0e18
+    VerifyAtlantisSpeeds aZRX 2e18 0e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 0e18
+    VerifyAtlantisSpeeds aBAT 0e18 0e18 -- Ensure these speeds weren't changed
+
+Test "Many different Atlantis supply speeds can be set, unset, and set again"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 0e18
+    SetAndVerifyAtlantisSpeeds aBAT 3e18 0e18
+    VerifyAtlantisSpeeds aZRX 2e18 0e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 0e18 0e18
+    VerifyAtlantisSpeeds aZRX 2e18 0e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 0e18
+    VerifyAtlantisSpeeds aBAT 0e18 0e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 5e18 0e18
+    VerifyAtlantisSpeeds aBAT 0e18 0e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 6e18 0e18
+    VerifyAtlantisSpeeds aZRX 5e18 0e18 -- Ensure these speeds weren't changed
+
+Test "Many different Atlantis supply speeds can be set w/ borrow speeds"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 1e18
+    SetAndVerifyAtlantisSpeeds aBAT 3e18 1e18
+    VerifyAtlantisSpeeds aZRX 2e18 1e18 -- Ensure these speeds weren't changed
+
+Test "Many different Atlantis supply speeds can be set then unset w/ borrow speeds"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 1e18
+    SetAndVerifyAtlantisSpeeds aBAT 3e18 1e18
+    VerifyAtlantisSpeeds aZRX 2e18 1e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 0e18 1e18
+    VerifyAtlantisSpeeds aZRX 2e18 1e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 1e18
+    VerifyAtlantisSpeeds aBAT 0e18 1e18 -- Ensure these speeds weren't changed
+
+Test "Many different Atlantis supply speeds can be set, unset, and set again w/ borrow speeds"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 2e18 1e18
+    SetAndVerifyAtlantisSpeeds aBAT 3e18 1e18
+    VerifyAtlantisSpeeds aZRX 2e18 1e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 0e18 1e18
+    VerifyAtlantisSpeeds aZRX 2e18 1e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 1e18
+    VerifyAtlantisSpeeds aBAT 0e18 1e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 5e18 1e18
+    VerifyAtlantisSpeeds aBAT 0e18 1e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 6e18 1e18
+    VerifyAtlantisSpeeds aZRX 5e18 1e18 -- Ensure these speeds weren't changed
+
+Test "Many different Atlantis borrow speeds can be set"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 2e18
+    SetAndVerifyAtlantisSpeeds aBAT 0e18 3e18
+    VerifyAtlantisSpeeds aZRX 0e18 2e18 -- Ensure these speeds weren't changed
+
+Test "Many different Atlantis borrow speeds can be set then unset"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 2e18
+    SetAndVerifyAtlantisSpeeds aBAT 0e18 3e18
+    VerifyAtlantisSpeeds aZRX 0e18 2e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 0e18 0e18
+    VerifyAtlantisSpeeds aZRX 0e18 2e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 0e18
+    VerifyAtlantisSpeeds aBAT 0e18 0e18 -- Ensure these speeds weren't changed
+
+Test "Many different Atlantis borrow speeds can be set, unset, and set again"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 2e18
+    SetAndVerifyAtlantisSpeeds aBAT 0e18 3e18
+    VerifyAtlantisSpeeds aZRX 0e18 2e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 0e18 0e18
+    VerifyAtlantisSpeeds aZRX 0e18 2e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 0e18
+    VerifyAtlantisSpeeds aBAT 0e18 0e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 0e18 5e18
+    VerifyAtlantisSpeeds aBAT 0e18 0e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 0e18 6e18
+    VerifyAtlantisSpeeds aZRX 0e18 5e18 -- Ensure these speeds weren't changed
+
+Test "Many different Atlantis borrow speeds can be set w/ supply speeds"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 2e18
+    SetAndVerifyAtlantisSpeeds aBAT 1e18 3e18
+    VerifyAtlantisSpeeds aZRX 1e18 2e18 -- Ensure these speeds weren't changed
+
+Test "Many different Atlantis borrow speeds can be set then unset w/ supply speeds"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 2e18
+    SetAndVerifyAtlantisSpeeds aBAT 1e18 3e18
+    VerifyAtlantisSpeeds aZRX 1e18 2e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 1e18 0e18
+    VerifyAtlantisSpeeds aZRX 1e18 2e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 0e18
+    VerifyAtlantisSpeeds aBAT 1e18 0e18 -- Ensure these speeds weren't changed
+
+Test "Many different Atlantis borrow speeds can be set, unset, and set again w/ supply speeds"
+    UseEnvironment1
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 2e18
+    SetAndVerifyAtlantisSpeeds aBAT 1e18 3e18
+    VerifyAtlantisSpeeds aZRX 1e18 2e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 1e18 0e18
+    VerifyAtlantisSpeeds aZRX 1e18 2e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 0e18
+    VerifyAtlantisSpeeds aBAT 1e18 0e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aZRX 1e18 5e18
+    VerifyAtlantisSpeeds aBAT 1e18 0e18 -- Ensure these speeds weren't changed
+    SetAndVerifyAtlantisSpeeds aBAT 1e18 6e18
+    VerifyAtlantisSpeeds aZRX 1e18 5e18 -- Ensure these speeds weren't changed

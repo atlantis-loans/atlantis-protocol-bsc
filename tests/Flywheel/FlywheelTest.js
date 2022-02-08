@@ -4,7 +4,9 @@ const {
   balanceOf,
   fastForward,
   pretendBorrow,
-  quickMint
+  quickMint,
+  quickBorrow,
+  enterMarkets
 } = require('../Utils/Atlantis');
 const {
   etherExp,
@@ -12,8 +14,10 @@ const {
   etherUnsigned,
   etherMantissa
 } = require('../Utils/Ethereum');
+const { default: BigNumber } = require('bignumber.js');
 
 const atlantisRate = etherUnsigned(1e18);
+const atlantisInitialIndex = 1e36;
 
 async function atlantisAccrued(comptroller, user) {
   return etherUnsigned(await call(comptroller, 'atlantisAccrued', [user]));
@@ -87,6 +91,7 @@ describe('Flywheel', () => {
     aREP = await makeAToken({comptroller, supportMarket: true, underlyingPrice: 2, interestRateModelOpts});
     aZRX = await makeAToken({comptroller, supportMarket: true, underlyingPrice: 3, interestRateModelOpts});
     aEVIL = await makeAToken({comptroller, supportMarket: false, underlyingPrice: 3, interestRateModelOpts});
+    aUSD = await makeSToken({comptroller, supportMarket: true, underlyingPrice: 1, collateralFactor: 0.5, interestRateModelOpts});
   });
 
   describe('_grantAtlantis()', () => {
@@ -118,7 +123,7 @@ describe('Flywheel', () => {
   describe('getAtlantisMarkets()', () => {
     it('should return the atlantis markets', async () => {
       for (let mkt of [aLOW, aREP, aZRX]) {
-        await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(0.5)]);
+        await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0.5)], [etherExp(0.5)]]);
       }
       expect(await call(comptroller, 'getAtlantisMarkets')).toEqual(
         [aLOW, aREP, aZRX].map((c) => c._address)
@@ -126,15 +131,15 @@ describe('Flywheel', () => {
     });
   });
 
-  describe('_setAtlantisSpeed()', () => {
+  describe('_setAtlantisSpeeds()', () => {
     it('should update market index when calling setAtlantisSpeed', async () => {
       const mkt = aREP;
       await send(comptroller, 'setBlockNumber', [0]);
       await send(mkt, 'harnessSetTotalSupply', [etherUnsigned(10e18)]);
 
-      await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(0.5)]);
+      await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0.5)], [etherExp(0.5)]]);
       await fastForward(comptroller, 20);
-      await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(1)]);
+      await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(1)], [etherExp(0.5)]]);
 
       const {index, block} = await call(comptroller, 'atlantisSupplyState', [mkt._address]);
       expect(index).toEqualNumber(2e36);
@@ -143,13 +148,17 @@ describe('Flywheel', () => {
 
     it('should correctly drop a atlantis market if called by admin', async () => {
       for (let mkt of [aLOW, aREP, aZRX]) {
-        await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(0.5)]);
+        await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0.5)], [etherExp(0.5)]]);
       }
-      const tx = await send(comptroller, '_setAtlantisSpeed', [aLOW._address, 0]);
+      const tx = await send(comptroller, '_setAtlantisSpeeds', [[aLOW._address], [0], [0]]);
       expect(await call(comptroller, 'getAtlantisMarkets')).toEqual(
         [aREP, aZRX].map((c) => c._address)
       );
-      expect(tx).toHaveLog('AtlantisSpeedUpdated', {
+      expect(tx).toHaveLog('AtlantisBorrowSpeedUpdated', {
+        aToken: aLOW._address,
+        newSpeed: 0
+      });
+      expect(tx).toHaveLog('AtlantisSupplySpeedUpdated', {
         aToken: aLOW._address,
         newSpeed: 0
       });
@@ -157,9 +166,9 @@ describe('Flywheel', () => {
 
     it('should correctly drop a atlantis market from middle of array', async () => {
       for (let mkt of [aLOW, aREP, aZRX]) {
-        await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(0.5)]);
+        await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0.5)], [etherExp(0.5)]]);
       }
-      await send(comptroller, '_setAtlantisSpeed', [aREP._address, 0]);
+      await send(comptroller, '_setAtlantisSpeeds', [[sREP._address], [0], [0]]);
       expect(await call(comptroller, 'getAtlantisMarkets')).toEqual(
         [aLOW, aZRX].map((c) => c._address)
       );
@@ -167,10 +176,10 @@ describe('Flywheel', () => {
 
     it('should not drop a atlantis market unless called by admin', async () => {
       for (let mkt of [aLOW, aREP, aZRX]) {
-        await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(0.5)]);
+        await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0.5)], [etherExp(0.5)]]);
       }
       await expect(
-        send(comptroller, '_setAtlantisSpeed', [aLOW._address, 0], {from: a1})
+        send(comptroller, '_setAtlantisSpeeds', [[aLOW._address], [0], [etherExp(0.5)]], {from: a1})
       ).rejects.toRevert('revert only admin can set atlantis speed');
     });
 
@@ -188,7 +197,7 @@ describe('Flywheel', () => {
   describe('updateAtlantisBorrowIndex()', () => {
     it('should calculate atlantis borrower index correctly', async () => {
       const mkt = aREP;
-      await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(0.5)]);
+      await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0.5)], [etherExp(0.5)]]);
       await send(comptroller, 'setBlockNumber', [100]);
       await send(mkt, 'harnessSetTotalBorrows', [etherUnsigned(11e18)]);
       await send(comptroller, 'harnessUpdateAtlantisBorrowIndex', [
@@ -224,37 +233,39 @@ describe('Flywheel', () => {
       ]);
 
       const {index, block} = await call(comptroller, 'atlantisBorrowState', [mkt._address]);
-      expect(index).toEqualNumber(0);
+      expect(index).toEqualNumber(atlantisInitialIndex);
       expect(block).toEqualNumber(100);
-      const speed = await call(comptroller, 'atlantisSpeeds', [mkt._address]);
-      expect(speed).toEqualNumber(0);
+      const supplySpeed = await call(comptroller, 'atlantisSupplySpeeds', [mkt._address]);
+      expect(supplySpeed).toEqualNumber(0);
+      const borrowSpeed = await call(comptroller, 'atlantisBorrowSpeeds', [mkt._address]);
+      expect(borrowSpeed).toEqualNumber(0);
     });
 
     it('should not update index if no blocks passed since last accrual', async () => {
       const mkt = aREP;
-      await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(0.5)]);
+      await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0.5)], [etherExp(0.5)]]);
       await send(comptroller, 'harnessUpdateAtlantisBorrowIndex', [
         mkt._address,
         etherExp(1.1),
       ]);
 
       const {index, block} = await call(comptroller, 'atlantisBorrowState', [mkt._address]);
-      expect(index).toEqualNumber(1e36);
+      expect(index).toEqualNumber(atlantisInitialIndex);
       expect(block).toEqualNumber(0);
     });
 
     it('should not update index if atlantis speed is 0', async () => {
       const mkt = aREP;
-      await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(0.5)]);
+      await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0.5)], [etherExp(0.5)]]);
       await send(comptroller, 'setBlockNumber', [100]);
-      await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(0)]);
+      await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0)], [etherExp(0)]]);
       await send(comptroller, 'harnessUpdateAtlantisBorrowIndex', [
         mkt._address,
         etherExp(1.1),
       ]);
 
       const {index, block} = await call(comptroller, 'atlantisBorrowState', [mkt._address]);
-      expect(index).toEqualNumber(1e36);
+      expect(index).toEqualNumber(atlantisInitialIndex);
       expect(block).toEqualNumber(100);
     });
   });
@@ -262,7 +273,7 @@ describe('Flywheel', () => {
   describe('updateAtlantisSupplyIndex()', () => {
     it('should calculate atlantis supplier index correctly', async () => {
       const mkt = aREP;
-      await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(0.5)]);
+      await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0.5)], [etherExp(0.5)]]);
       await send(comptroller, 'setBlockNumber', [100]);
       await send(mkt, 'harnessSetTotalSupply', [etherUnsigned(10e18)]);
       await send(comptroller, 'harnessUpdateAtlantisSupplyIndex', [mkt._address]);
@@ -290,10 +301,12 @@ describe('Flywheel', () => {
       ]);
 
       const {index, block} = await call(comptroller, 'atlantisSupplyState', [mkt._address]);
-      expect(index).toEqualNumber(0);
+      expect(index).toEqualNumber(atlantisInitialIndex);
       expect(block).toEqualNumber(100);
-      const speed = await call(comptroller, 'atlantisSpeeds', [mkt._address]);
-      expect(speed).toEqualNumber(0);
+      const supplySpeed = await call(comptroller, 'atlantisSupplySpeeds', [mkt._address]);
+      expect(supplySpeed).toEqualNumber(0);
+      const borrowSpeed = await call(comptroller, 'atlantisBorrowSpeeds', [mkt._address]);
+      expect(borrowSpeed).toEqualNumber(0);
       // atoken could have no atlantis speed or atlantis supplier state if not in atlantis markets
       // this logic could also possibly be implemented in the allowed hook
     });
@@ -302,11 +315,11 @@ describe('Flywheel', () => {
       const mkt = aREP;
       await send(comptroller, 'setBlockNumber', [0]);
       await send(mkt, 'harnessSetTotalSupply', [etherUnsigned(10e18)]);
-      await send(comptroller, '_setAtlantisSpeed', [mkt._address, etherExp(0.5)]);
+      await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0.5)], [etherExp(0.5)]]);
       await send(comptroller, 'harnessUpdateAtlantisSupplyIndex', [mkt._address]);
 
       const {index, block} = await call(comptroller, 'atlantisSupplyState', [mkt._address]);
-      expect(index).toEqualNumber(1e36);
+      expect(index).toEqualNumber(atlantisInitialIndex);
       expect(block).toEqualNumber(0);
     });
 
@@ -427,7 +440,7 @@ describe('Flywheel', () => {
       await send(comptroller, "harnessDistributeBorrowerAtlantis", [mkt._address, a1, etherExp(1.1)]);
       expect(await atlantisAccrued(comptroller, a1)).toEqualNumber(0);
       expect(await AtlantisBalance(comptroller, a1)).toEqualNumber(0);
-      expect(await call(comptroller, 'atlantisBorrowerIndex', [mkt._address, a1])).toEqualNumber(0);
+      expect(await call(comptroller, 'atlantisBorrowerIndex', [mkt._address, a1])).toEqualNumber(atlantisInitialIndex);
     });
   });
 
@@ -556,9 +569,10 @@ describe('Flywheel', () => {
       const atlantisRemaining = atlantisRate.multipliedBy(100), mintAmount = etherUnsigned(12e18), deltaBlocks = 10;
       await send(comptroller.atlantis, 'transfer', [comptroller._address, atlantisRemaining], {from: root});
       await pretendBorrow(aLOW, a1, 1, 1, 100);
-      await send(comptroller, '_setAtlantisSpeed', [aLOW._address, etherExp(0.5)]);
+      await send(comptroller, '_setAtlantisSpeeds', [[aLOW._address], [etherExp(0.5)], [etherExp(0.5)]]);
       await send(comptroller, 'harnessRefreshAtlantisSpeeds');
-      const speed = await call(comptroller, 'atlantisSpeeds', [aLOW._address]);
+      const supplySpeed = await call(comptroller, 'atlantisSupplySpeeds', [aLOW._address]);
+      const borrowSpeed = await call(comptroller, 'atlantisBorrowSpeeds', [aLOW._address]);
       const a2AccruedPre = await atlantisAccrued(comptroller, a2);
       const AtlantisBalancePre = await AtlantisBalance(comptroller, a2);
       await quickMint(aLOW, a2, mintAmount);
@@ -566,7 +580,9 @@ describe('Flywheel', () => {
       const tx = await send(comptroller, 'claimAtlantis', [a2]);
       const a2AccruedPost = await atlantisAccrued(comptroller, a2);
       const AtlantisBalancePost = await AtlantisBalance(comptroller, a2);
-      expect(tx.gasUsed).toBeLessThan(400000);
+      expect(tx.gasUsed).toBeLessThan(500000);
+      expect(supplySpeed).toEqualNumber(atlantisRate);
+      expect(borrowSpeed).toEqualNumber(atlantisRate);
       expect(speed).toEqualNumber(atlantisRate);
       expect(a2AccruedPre).toEqualNumber(0);
       expect(a2AccruedPost).toEqualNumber(0);
@@ -580,7 +596,8 @@ describe('Flywheel', () => {
       await pretendBorrow(aLOW, a1, 1, 1, 100);
       await send(comptroller, 'harnessAddAtlantisMarkets', [[aLOW._address]]);
       await send(comptroller, 'harnessRefreshAtlantisSpeeds');
-      const speed = await call(comptroller, 'atlantisSpeeds', [aLOW._address]);
+      const supplySpeed = await call(comptroller, 'atlantisSupplySpeeds', [aLOW._address]);
+      const borrowSpeed = await call(comptroller, 'atlantisBorrowSpeeds', [aLOW._address]);
       const a2AccruedPre = await atlantisAccrued(comptroller, a2);
       const AtlantisBalancePre = await AtlantisBalance(comptroller, a2);
       await quickMint(aLOW, a2, mintAmount);
@@ -589,7 +606,8 @@ describe('Flywheel', () => {
       const a2AccruedPost = await atlantisAccrued(comptroller, a2);
       const AtlantisBalancePost = await AtlantisBalance(comptroller, a2);
       expect(tx.gasUsed).toBeLessThan(170000);
-      expect(speed).toEqualNumber(atlantisRate);
+      expect(supplySpeed).toEqualNumber(atlantisRate);
+      expect(borrowSpeed).toEqualNumber(atlantisRate);
       expect(a2AccruedPre).toEqualNumber(0);
       expect(a2AccruedPost).toEqualNumber(0);
       expect(AtlantisBalancePre).toEqualNumber(0);
@@ -711,19 +729,27 @@ describe('Flywheel', () => {
   describe('harnessRefreshAtlantisSpeeds', () => {
     it('should start out 0', async () => {
       await send(comptroller, 'harnessRefreshAtlantisSpeeds');
-      const speed = await call(comptroller, 'atlantisSpeeds', [aLOW._address]);
-      expect(speed).toEqualNumber(0);
+      const supplySpeed = await call(comptroller, 'atlantisSupplySpeeds', [aLOW._address]);
+      const borrowSpeed = await call(comptroller, 'atlantisBorrowSpeeds', [aLOW._address]);
+      expect(supplySpeed).toEqualNumber(0);
+      expect(borrowSpeed).toEqualNumber(0);
     });
 
     it('should get correct speeds with borrows', async () => {
       await pretendBorrow(aLOW, a1, 1, 1, 100);
       await send(comptroller, 'harnessAddAtlantisMarkets', [[aLOW._address]]);
       const tx = await send(comptroller, 'harnessRefreshAtlantisSpeeds');
-      const speed = await call(comptroller, 'atlantisSpeeds', [aLOW._address]);
-      expect(speed).toEqualNumber(atlantisRate);
-      expect(tx).toHaveLog(['AtlantisSpeedUpdated', 0], {
+      const supplySpeed = await call(comptroller, 'atlantisSupplySpeeds', [aLOW._address]);
+      const borrowSpeed = await call(comptroller, 'atlantisBorrowSpeeds', [aLOW._address]);
+      expect(supplySpeed).toEqualNumber(atlantisRate);
+      expect(borrowSpeed).toEqualNumber(atlantisRate);
+      expect(tx).toHaveLog(['AtlantisBorrowSpeedUpdated', 0], {
         aToken: aLOW._address,
-        newSpeed: speed
+        newSpeed: borrowSpeed
+      });
+      expect(tx).toHaveLog(['AtlantisSupplySpeedUpdated', 0], {
+        aToken: aLOW._address,
+        newSpeed: supplySpeed
       });
     });
 
@@ -732,12 +758,137 @@ describe('Flywheel', () => {
       await pretendBorrow(aZRX, a1, 1, 1, 100);
       await send(comptroller, 'harnessAddAtlantisMarkets', [[aLOW._address, aZRX._address]]);
       await send(comptroller, 'harnessRefreshAtlantisSpeeds');
-      const speed1 = await call(comptroller, 'atlantisSpeeds', [aLOW._address]);
-      const speed2 = await call(comptroller, 'atlantisSpeeds', [aREP._address]);
-      const speed3 = await call(comptroller, 'atlantisSpeeds', [aZRX._address]);
-      expect(speed1).toEqualNumber(atlantisRate.dividedBy(4));
-      expect(speed2).toEqualNumber(0);
-      expect(speed3).toEqualNumber(atlantisRate.dividedBy(4).multipliedBy(3));
+      const supplySpeed1 = await call(comptroller, 'atlantisSupplySpeeds', [aLOW._address]);
+      const borrowSpeed1 = await call(comptroller, 'atlantisBorrowSpeeds', [aLOW._address]);
+      const supplySpeed2 = await call(comptroller, 'atlantisSupplySpeeds', [aREP._address]);
+      const borrowSpeed2 = await call(comptroller, 'atlantisBorrowSpeeds', [aREP._address]);
+      const supplySpeed3 = await call(comptroller, 'atlantisSupplySpeeds', [aZRX._address]);
+      const borrowSpeed3 = await call(comptroller, 'atlantisBorrowSpeeds', [aZRX._address]);
+      const atlantisRateBN = new BigNumber(atlantisRate.toString());
+      expect(supplySpeed1).toEqualNumber(atlantisRateBN.dividedBy(4));
+      expect(borrowSpeed1).toEqualNumber(atlantisRateBN.dividedBy(4));
+      expect(supplySpeed2).toEqualNumber(0);
+      expect(borrowSpeed2).toEqualNumber(0);
+      expect(supplySpeed3).toEqualNumber(atlantisRateBN.dividedBy(4).multipliedBy(3));
+      expect(borrowSpeed3).toEqualNumber(atlantisRateBN.dividedBy(4).multipliedBy(3));
+    });
+  });
+
+  describe('harnessSetAtlantisSpeeds', () => {
+    it('should correctly set differing Atlantis supply and borrow speeds', async () => {
+      const desiredAtlantisSupplySpeed = 3;
+      const desiredAtlantisBorrowSpeed = 20;
+      await send(comptroller, 'harnessAddAtlantisMarkets', [[aLOW._address]]);
+      const tx = await send(comptroller, '_setAtlantisSpeeds', [[aLOW._address], [desiredAtlantisSupplySpeed], [desiredAtlantisBorrowSpeed]]);
+      expect(tx).toHaveLog(['AtlantisBorrowSpeedUpdated', 0], {
+        aToken: aLOW._address,
+        newSpeed: desiredAtlantisBorrowSpeed
+      });
+      expect(tx).toHaveLog(['AtlantisSupplySpeedUpdated', 0], {
+        aToken: aLOW._address,
+        newSpeed: desiredAtlantisSupplySpeed
+      });
+      const currentAtlantisSupplySpeed = await call(comptroller, 'atlantisSupplySpeeds', [aLOW._address]);
+      const currentAtlantisBorrowSpeed = await call(comptroller, 'atlantisBorrowSpeeds', [aLOW._address]);
+      expect(currentAtlantisSupplySpeed).toEqualNumber(desiredAtlantisSupplySpeed);
+      expect(currentAtlantisBorrowSpeed).toEqualNumber(desiredAtlantisBorrowSpeed);
+    });
+
+    it('should correctly get differing Atlantis supply and borrow speeds for 4 assets', async () => {
+      const aBAT = await makeSToken({ comptroller, supportMarket: true });
+      const aDAI = await makeSToken({ comptroller, supportMarket: true });
+
+      const borrowSpeed1 = 5;
+      const supplySpeed1 = 10;
+
+      const borrowSpeed2 = 0;
+      const supplySpeed2 = 100;
+
+      const borrowSpeed3 = 0;
+      const supplySpeed3 = 0;
+
+      const borrowSpeed4 = 13;
+      const supplySpeed4 = 0;
+
+      await send(comptroller, 'harnessAddAtlantisMarkets', [[aREP._address, aZRX._address, aBAT._address, aDAI._address]]);
+      await send(comptroller, '_setAtlantisSpeeds', [[aREP._address, aZRX._address, aBAT._address, aDAI._address], [supplySpeed1, supplySpeed2, supplySpeed3, supplySpeed4], [borrowSpeed1, borrowSpeed2, borrowSpeed3, borrowSpeed4]]);
+
+      const currentSupplySpeed1 = await call(comptroller, 'atlantisSupplySpeeds', [aREP._address]);
+      const currentBorrowSpeed1 = await call(comptroller, 'atlantisBorrowSpeeds', [aREP._address]);
+      const currentSupplySpeed2 = await call(comptroller, 'atlantisSupplySpeeds', [aZRX._address]);
+      const currentBorrowSpeed2 = await call(comptroller, 'atlantisBorrowSpeeds', [aZRX._address]);
+      const currentSupplySpeed3 = await call(comptroller, 'atlantisSupplySpeeds', [aBAT._address]);
+      const currentBorrowSpeed3 = await call(comptroller, 'atlantisBorrowSpeeds', [aBAT._address]);
+      const currentSupplySpeed4 = await call(comptroller, 'atlantisSupplySpeeds', [aDAI._address]);
+      const currentBorrowSpeed4 = await call(comptroller, 'atlantisBorrowSpeeds', [aDAI._address]);
+
+      expect(currentSupplySpeed1).toEqualNumber(supplySpeed1);
+      expect(currentBorrowSpeed1).toEqualNumber(borrowSpeed1);
+      expect(currentSupplySpeed2).toEqualNumber(supplySpeed2);
+      expect(currentBorrowSpeed2).toEqualNumber(borrowSpeed2);
+      expect(currentSupplySpeed3).toEqualNumber(supplySpeed3);
+      expect(currentBorrowSpeed3).toEqualNumber(borrowSpeed3);
+      expect(currentSupplySpeed4).toEqualNumber(supplySpeed4);
+      expect(currentBorrowSpeed4).toEqualNumber(borrowSpeed4);
+    });
+
+    const checkAccrualsBorrowAndSupply = async (atlantisSupplySpeed, atlantisBorrowSpeed) => {
+      const atlantisRateBN = new BigNumber(atlantisRate.toString());
+      const mintAmount = etherUnsigned(1000e18), borrowAmount = etherUnsigned(1e18), borrowCollateralAmount = etherUnsigned(1000e18), atlantisRemaining = atlantisRateBN.multipliedBy(100), deltaBlocks = 10;
+
+      // Transfer Atlantis to the comptroller
+      await send(comptroller.atlantis, 'transfer', [comptroller._address, atlantisRemaining.toString()], {from: root});
+
+      // Setup comptroller
+      await send(comptroller, 'harnessAddAtlantisMarkets', [[aLOW._address, aUSD._address]]);
+
+      // Set comp speeds to 0 while we setup
+      await send(comptroller, '_setAtlantisSpeeds', [[aLOW._address, aUSD._address], [0, 0], [0, 0]]);
+
+      // a2 - supply
+      await quickMint(aLOW, a2, mintAmount); // a2 is the supplier
+
+      // a1 - borrow (with supplied collateral)
+      await quickMint(aUSD, a1, borrowCollateralAmount);
+      await enterMarkets([aUSD], a1);
+      await quickBorrow(aLOW, a1, borrowAmount); // a1 is the borrower
+
+      // Initialize atlantis speeds
+      await send(comptroller, '_setAtlantisSpeeds', [[aLOW._address], [atlantisSupplySpeed], [atlantisBorrowSpeed]]);
+
+      // Get initial Atlantis balances
+      const a1TotalAtlantisPre = await totalAtlantisAccrued(comptroller, a1);
+      const a2TotalAtlantisPre = await totalAtlantisAccrued(comptroller, a2);
+
+      // Start off with no Atlantis accrued and no Atlantis balance
+      expect(a1TotalAtlantisPre).toEqualNumber(0);
+      expect(a2TotalAtlantisPre).toEqualNumber(0);
+
+      // Fast forward blocks
+      await fastForward(comptroller, deltaBlocks);
+
+      // Accrue COMP
+      await send(comptroller, 'claimAtlantis', [[a1, a2], [aLOW._address], true, true]);
+
+      // Get accrued Atlantis balances
+      const a1TotalAtlantisPost = await totalAtlantisAccrued(comptroller, a1);
+      const a2TotalAtlantisPost = await totalAtlantisAccrued(comptroller, a2);
+
+      // check accrual for borrow
+      const atlantisBorrowSpeedBN = new BigNumber(atlantisBorrowSpeed.toString());
+      expect(a1TotalAtlantisPost).toEqualNumber(Number(atlantisBorrowSpeed) > 0 ? atlantisBorrowSpeedBN.multipliedBy(deltaBlocks).minus(1) : 0);
+
+      // check accrual for supply
+      const atlantisSupplySpeedBN = new BigNumber(atlantisSupplySpeed.toString());
+      expect(a2TotalAtlantisPost).toEqualNumber(Number(atlantisSupplySpeed) > 0 ? atlantisSupplySpeedBN.multipliedBy(deltaBlocks) : 0);
+    };
+
+    it('should accrue atlantis correctly with only supply-side rewards', async () => {
+      await checkAccrualsBorrowAndSupply(/* supply speed */ etherExp(0.5), /* borrow speed */ etherExp(0));
+    });
+
+    it('should accrue atlantis correctly with only borrow-side rewards', async () => {
+      await checkAccrualsBorrowAndSupply(/* supply speed */ 0, /* borrow speed */ etherExp(0.5));
     });
   });
 

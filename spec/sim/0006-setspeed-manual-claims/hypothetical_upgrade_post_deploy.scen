@@ -19,9 +19,9 @@ From USDCWhale (Trx GasPrice 0 (AToken aUSDC Mint 10000e6))
 -- Baseline Atlantis claim speed
 Assert Equal (Comptroller CheckIsComped aDAI) True
 
-Comptroller ClaimAtl DAIWhale
+Comptroller ClaimAtlantis DAIWhale
 AdvanceBlocks 1000
-Comptroller ClaimAtl DAIWhale
+Comptroller ClaimAtlantis DAIWhale
 
 -- Propose to apply the patch
 
@@ -42,9 +42,9 @@ ComptrollerImpl ComptrollerG7 MergeABI
 Assert Equal (Comptroller AtlantisSpeed aUSDC) 3.0e16
 
 -- Check that Atlantis is still accruing at the same speed
-Comptroller ClaimAtl DAIWhale
+Comptroller ClaimAtlantis DAIWhale
 AdvanceBlocks 1000
-Comptroller ClaimAtl DAIWhale
+Comptroller ClaimAtlantis DAIWhale
 
 -- Check that minting some USDC wont result in any automatic claims
 AdvanceBlocks 1000000
@@ -70,12 +70,12 @@ AdvanceBlocks 1000
 Assert Equal (Comptroller AtlantisSpeed aUSDC) 0
 
 -- True up balances
-Comptroller ClaimAtl USDCWhale
+Comptroller ClaimAtlantis USDCWhale
 
 -- Check no more atlantis accrued
 AdvanceBlocks 1000000
 Expect Changes (Bep20 Atlantis TokenBalance USDCWhale) 0
-Comptroller ClaimAtl USDCWhale
+Comptroller ClaimAtlantis USDCWhale
 
 -- Prepare final proposal
 From AtlantisHolder (Governor GovernorAlpha Propose "Reset USDC atlantis speed" [(Address Unitroller)] [0] ["_setAtlantisSpeed(address,uint256)"] [[(Address aUSDC) 27000000000000000]])

@@ -1,126 +1,108 @@
--- Tests for the grants and math patch
-
-Macro FlywheelComptroller price=1.0 borrowRate=0.000005 atlantisInitAmount=5000000e18
+Macro DeployComptroller price=1.0
     Unitroller Deploy
     PriceOracle Deploy Fixed price
     PriceOracleProxy Deploy Admin (PriceOracle Address) (Address Zero) (Address Zero) (Address Zero) (Address Zero) (Address Zero)
-    ----g2
-    ComptrollerImpl Deploy ScenarioG2 ComptrollerScenG2
-    Unitroller SetPendingImpl ComptrollerScenG2
-    ComptrollerImpl ComptrollerScenG2 BecomeG2
-    --list some tokens
+    ComptrollerImpl Deploy Scenario ComptrollerScen
+    Unitroller SetPendingImpl ComptrollerScen
+    ComptrollerImpl ComptrollerScen Become
     Comptroller SetPriceOracle (PriceOracleProxy Address)
-    Comptroller SetMaxAssets 20
     Comptroller SetCloseFactor 0.5
     Comptroller LiquidationIncentive 1.1
+
+Macro SetupMarkets
     NewAToken ZRX aZRX
     NewAToken BAT aBAT
     Support aZRX collateralFactor:0.5
     Support aBAT collateralFactor:0.5
-    -- final
-    ComptrollerImpl Deploy ScenarioG3 ComptrollerScen
-    Unitroller SetPendingImpl ComptrollerScen
-    ComptrollerImpl ComptrollerScen BecomeG3 1e18 [aZRX aBAT]
+
+Macro SetupCompToken atlantisInitAmount=5000000e18
     Bep20 Deploy Standard Atlantis "Atlantis Token" 18
     Give (Address Comptroller) atlantisInitAmount Atlantis
+    Comptroller Send "setAtlantisAddress(address)" (Address Atlantis)
 
-Macro GrantsComptroller
-    FlywheelComptroller
-    -- g4
-    ComptrollerImpl Deploy ScenarioG4 ComptrollerScen
-    Unitroller SetPendingImpl ComptrollerScen
-    ComptrollerImpl ComptrollerScen BecomeG4
-    -- g5
-    ComptrollerImpl Deploy ScenarioG5 ComptrollerScen
-    Unitroller SetPendingImpl ComptrollerScen
-    ComptrollerImpl ComptrollerScen BecomeG5
-    -- g6
-    ComptrollerImpl Deploy ScenarioG6 ComptrollerScen
-    Unitroller SetPendingImpl ComptrollerScen
-    ComptrollerImpl ComptrollerScen BecomeG6
-    -- current
-    ComptrollerImpl Deploy Scenario ComptrollerScen
-    Unitroller SetPendingImpl ComptrollerScen
-    ComptrollerImpl ComptrollerScen Become
+Macro FlywheelComptroller price=1.0 borrowRate=0.000005 atlantisInitAmount=5000000e18
+    DeployComptroller price
+    SetupMarkets
+    SetupCompToken atlantisInitAmount
 
-Macro InitSpeeds
+Macro InitUsage
     Prep Geoff 100e18 ZRX aZRX
     Mint Geoff 50e18 aZRX--tokenbalance = 50e18 / 2e9 = 2.5e10
     Prep Coburn Some BAT aBAT
     Mint Coburn 6e18 aBAT--tokenbalance = 6e18 / 2e9 = 3e9
     EnterMarkets Coburn aBAT
     Borrow Coburn 1e18 aZRX
-    Comptroller SetAtlantisSpeed aZRX 1
-    Comptroller SetAtlantisSpeed aBAT 1
-    Comptroller RefreshAtlantisSpeeds
-    Comptroller Send "setAtlantisAddress(address)" (Address Atlantis)
+
+Macro InitUsageAndSpeeds
+    InitUsage
+    Comptroller SetAtlantisSpeeds (aZRX aBAT) (1 1) (1 1)
 
 Test "Atlantis can be granted in combination with liquidity rewards"
-    GrantsComptroller
-    InitSpeeds
+    FlywheelComptroller
+    InitUsageAndSpeeds
     Assert Equal (Comptroller AtlantisAccrued Geoff) 0
     Assert Equal (Bep20 Atlantis TokenBalance Geoff) 0
     FastForward 1000 Blocks
-    Comptroller ClaimAtl Geoff
+    Comptroller ClaimAtlantis Geoff
     Comptroller Send "_grantAtlantis(address,uint256)" (Address Geoff) 1000
     Assert Equal (Comptroller AtlantisAccrued Geoff) 0
-    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 1000000000000000001000
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 2000 -- 1000 (grant) + 1000 (Atlantis supply rewards)
 
 Test "Atlantis can be granted"
     -- Can be granted once
-    GrantsComptroller
-    InitSpeeds
+    FlywheelComptroller
+    InitUsageAndSpeeds
     Assert Equal (Comptroller AtlantisAccrued Geoff) 0
     Assert Equal (Bep20 Atlantis TokenBalance Geoff) 0
     Comptroller Send "_grantAtlantis(address,uint256)" (Address Geoff) 1000
     Assert Equal (Comptroller AtlantisAccrued Geoff) 0
     Assert Equal (Bep20 Atlantis TokenBalance Geoff) 1000
-    -- Assert Log AtlantisGranted (recipient (Address Geoff)) (amount "1000")
+    -- Assert Log CompGranted (recipient (Address Geoff)) (amount "1000")
     -- Can be granted multiple times
     Comptroller Send "_grantAtlantis(address,uint256)" (Address Geoff) 2000
     Assert Equal (Comptroller AtlantisAccrued Geoff) 0
     Assert Equal (Bep20 Atlantis TokenBalance Geoff) 3000
 
 Test "Atlantis can be streamed to contributors"
-    GrantsComptroller
-    InitSpeeds
+    FlywheelComptroller
+    InitUsageAndSpeeds
     Assert Equal (Comptroller AtlantisAccrued Torrey) 0
     Assert Equal (Bep20 Atlantis TokenBalance Torrey) 0
     Comptroller Send "_setContributorAtlantisSpeed(address,uint256)" (Address Torrey) 300
-    -- Assert Log ContributorAtlantisSpeedUpdated (recipient (Address Torrey)) (amount "300")
+    -- Assert Log ContributorCompSpeedUpdated (recipient (Address Torrey)) (amount "300")
     FastForward 1000 Blocks
-    -- Just claimAtlantis does not receive Atlantis
-    Comptroller ClaimAtl Torrey
+    -- Just claimComp does not receive Atlantis
+    Comptroller ClaimAtlantis Torrey
     Assert Equal (Comptroller AtlantisAccrued Torrey) 0
     Assert Equal (Bep20 Atlantis TokenBalance Torrey) 0
-    -- Calling updateContributorRewards and then claimAtlantis receives Atlantis
+    -- Calling updateContributorRewards and then claimComp receives Atlantis
     Comptroller UpdateContributorRewards Torrey
     Assert Equal (Comptroller AtlantisAccrued Torrey) 300000
-    Comptroller ClaimAtl Torrey
+    Comptroller ClaimAtlantis Torrey
     Assert Equal (Comptroller AtlantisAccrued Torrey) 0
     Assert Equal (Bep20 Atlantis TokenBalance Torrey) 300000
 
 Test "Atlantis can be streamed in combination with liquidity rewards"
-    GrantsComptroller
-    InitSpeeds
+    FlywheelComptroller
+    InitUsageAndSpeeds
     Comptroller Send "_setContributorAtlantisSpeed(address,uint256)" (Address Geoff) 300
     FastForward 1000 Blocks
-    -- Just claimAtlantis does not receive Atlantis
+    --Just claimComp does not receive Atlantis
     Comptroller UpdateContributorRewards Geoff
     Assert Equal (Comptroller AtlantisAccrued Geoff) 300000
-    Comptroller ClaimAtl Geoff
+    Comptroller ClaimAtlantis Geoff
     Assert Equal (Comptroller AtlantisAccrued Geoff) 0
-    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 1000000000000000300000
+    Assert Equal (Bep20 Atlantis TokenBalance Geoff) 301000 -- 300000 (contributer grant) + 1000 (Atlantis supply rewards)
 
 Test "Atlantis streaming can be changed for contributors"
-    GrantsComptroller
-    InitSpeeds
+    FlywheelComptroller
+    InitUsageAndSpeeds
     Comptroller Send "_setContributorAtlantisSpeed(address,uint256)" (Address Torrey) 300
     FastForward 1000 Blocks
     Comptroller Send "_setContributorAtlantisSpeed(address,uint256)" (Address Torrey) 600
     FastForward 1000 Blocks
     Comptroller UpdateContributorRewards Torrey
-    Comptroller ClaimAtl Torrey
+    Comptroller ClaimAtlantis Torrey
     Assert Equal (Comptroller AtlantisAccrued Torrey) 0
     Assert Equal (Bep20 Atlantis TokenBalance Torrey) 900000
     Comptroller Send "_setContributorAtlantisSpeed(address,uint256)" (Address Torrey) 0

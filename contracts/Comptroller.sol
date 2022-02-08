@@ -12,7 +12,7 @@ import "./Governance/Atlantis.sol";
  * @title Atlantis's Comptroller Contract
  * @author Atlantis
  */
-contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerErrorReporter, ExponentialNoError {
+contract Comptroller is ComptrollerV6Storage, ComptrollerInterface, ComptrollerErrorReporter, ExponentialNoError {
     /// @notice Emitted when an admin supports a market
     event MarketListed(AToken aToken);
 
@@ -63,6 +63,12 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
 
     /// @notice Emitted when Atlantis is granted by admin
     event AtlantisGranted(address recipient, uint amount);
+
+     /// @notice Emitted when a new borrow-side Atlantis speed is calculated for a market
+    event AtlantisBorrowSpeedUpdated(AToken indexed aToken, uint newSpeed);
+
+    /// @notice Emitted when a new supply-side Atlantis speed is calculated for a market
+    event AtlantisSupplySpeedUpdated(AToken indexed aToken, uint newSpeed);
 
     /// @notice Emitted when Vault info is changed
     event NewVaultInfo(address vault_, uint releaseStartBlock_, uint releaseInterval_);
@@ -943,11 +949,34 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
         markets[address(aToken)] = Market({isListed: true, isAtled: false, collateralFactorMantissa: 0});
 
         _addMarketInternal(address(aToken));
+        _initializeMarket(address(aToken));
 
         emit MarketListed(aToken);
 
         return uint(Error.NO_ERROR);
     }
+
+    function _initializeMarket(address aToken) internal {
+        uint32 blockNumber = safe32(getBlockNumber(), "block number exceeds 32 bits");
+
+        AtlantisMarketState storage supplyState = atlantisSupplyState[aToken];
+        AtlantisMarketState storage borrowState = atlantisBorrowState[aToken];
+
+        /*
+         * Update market state indices
+         */
+        if (supplyState.index == 0) {
+            // Initialize supply state index with default value
+            supplyState.index = atlantisInitialIndex;
+        }
+
+         if (borrowState.index == 0) {
+            // Initialize borrow state index with default value
+            borrowState.index = atlantisInitialIndex;
+        }
+
+        supplyState.block = borrowState.block = blockNumber;
+    }    
 
     function _addMarketInternal(address aToken) internal {
         for (uint i = 0; i < allMarkets.length; i ++) {
@@ -955,7 +984,6 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
         }
         allMarkets.push(AToken(aToken));
     }
-
 
     /**
       * @notice Set the given borrow caps for the given aToken markets. Borrowing that brings total borrows to or above borrow cap will revert.
@@ -1071,44 +1099,26 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
     /**
      * @notice Set Atlantis speed for a single market
      * @param aToken The market whose Atlantis speed to update
-     * @param atlantisSpeed New Atlantis speed for market
+     * @param supplySpeed New supply-side Atlantis speed for market
+     * @param borrowSpeed New borrow-side Atlantis speed for market
      */
-    function setAtlantisSpeedInternal(AToken aToken, uint atlantisSpeed) internal {
-        uint currentAtlantisSpeed = atlantisSpeeds[address(aToken)];
-        if (currentAtlantisSpeed != 0) {
-            // note that Atlantis speed could be set to 0 to halt liquidity rewards for a market
-            Exp memory borrowIndex = Exp({mantissa: aToken.borrowIndex()});
+    function setAtlantisSpeedInternal(AToken aToken, uint supplySpeed, uint borrowSpeed) internal {
+        Market storage market = markets[address(aToken)];
+        require(market.isListed, "Atlantis market is not listed");
+
+        if (atlantisSupplySpeeds[address(aToken)] != supplySpeed) {
             updateAtlantisSupplyIndex(address(aToken));
-            updateAtlantisBorrowIndex(address(aToken), borrowIndex);
-        } else if (atlantisSpeed != 0) {
-            // Add the Atlantis market
-            Market storage market = markets[address(aToken)];
-            require(market.isListed == true, "atlantis market is not listed");
-
-            if (atlantisSupplyState[address(aToken)].index == 0) {
-                atlantisSupplyState[address(aToken)] = AtlantisMarketState({
-                    index: atlantisInitialIndex,
-                    block: safe32(getBlockNumber(), "block number exceeds 32 bits")
-                });
-            } else {
-                // Update block number to ensure extra interest is not accrued during the prior period
-                atlantisSupplyState[address(aToken)].block = safe32(getBlockNumber(), "block number exceeds 32 bits");
-            }
-
-            if (atlantisBorrowState[address(aToken)].index == 0) {
-                atlantisBorrowState[address(aToken)] = AtlantisMarketState({
-                    index: atlantisInitialIndex,
-                    block: safe32(getBlockNumber(), "block number exceeds 32 bits")
-                });
-            } else {
-                // Update block number to ensure extra interest is not accrued during the prior period
-                atlantisBorrowState[address(aToken)].block = safe32(getBlockNumber(), "block number exceeds 32 bits");
-            }
+            atlantisSupplySpeeds[address(aToken)] = supplySpeed;
+            emit AtlantisSupplySpeedUpdated(aToken, supplySpeed);
         }
 
-        if (currentAtlantisSpeed != atlantisSpeed) {
-            atlantisSpeeds[address(aToken)] = atlantisSpeed;
-            emit AtlantisSpeedUpdated(aToken, atlantisSpeed);
+        if (atlantisBorrowSpeeds[address(aToken)] != borrowSpeed) {
+            Exp memory borrowIndex = Exp({mantissa: aToken.borrowIndex()});
+            updateAtlantisBorrowIndex(address(aToken), borrowIndex);
+
+            // Update speed and emit event
+            atlantisBorrowSpeeds[address(aToken)] = borrowSpeed;
+            emit AtlantisBorrowSpeedUpdated(aToken, borrowSpeed);
         }
     }
 
@@ -1118,20 +1128,17 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
      */
     function updateAtlantisSupplyIndex(address aToken) internal {
         AtlantisMarketState storage supplyState = atlantisSupplyState[aToken];
-        uint supplySpeed = atlantisSpeeds[aToken];
-        uint blockNumber = getBlockNumber();
-        uint deltaBlocks = sub_(blockNumber, uint(supplyState.block));
+        uint supplySpeed = atlantisSupplySpeeds[aToken];
+        uint32 blockNumber = safe32(getBlockNumber(), "block number exceeds 32 bits");
+        uint deltaBlocks = sub_(uint(blockNumber), uint(supplyState.block));
         if (deltaBlocks > 0 && supplySpeed > 0) {
             uint supplyTokens = AToken(aToken).totalSupply();
             uint atlantisAccrued = mul_(deltaBlocks, supplySpeed);
             Double memory ratio = supplyTokens > 0 ? fraction(atlantisAccrued, supplyTokens) : Double({mantissa: 0});
-            Double memory index = add_(Double({mantissa: supplyState.index}), ratio);
-            atlantisSupplyState[aToken] = AtlantisMarketState({
-                index: safe224(index.mantissa, "new index exceeds 224 bits"),
-                block: safe32(blockNumber, "block number exceeds 32 bits")
-            });
+            supplyState.index = safe224(add_(Double({mantissa: supplyState.index}), ratio).mantissa, "new index exceeds 224 bits");
+            supplyState.block = blockNumber;
         } else if (deltaBlocks > 0) {
-            supplyState.block = safe32(blockNumber, "block number exceeds 32 bits");
+            supplyState.block = blockNumber;
         }
     }
 
@@ -1141,20 +1148,17 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
      */
     function updateAtlantisBorrowIndex(address aToken, Exp memory marketBorrowIndex) internal {
         AtlantisMarketState storage borrowState = atlantisBorrowState[aToken];
-        uint borrowSpeed = atlantisSpeeds[aToken];
-        uint blockNumber = getBlockNumber();
-        uint deltaBlocks = sub_(blockNumber, uint(borrowState.block));
+        uint borrowSpeed = atlantisBorrowSpeeds[aToken];
+        uint32 blockNumber = safe32(getBlockNumber(), "block number exceeds 32 bits");
+        uint deltaBlocks = sub_(uint(blockNumber), uint(borrowState.block));
         if (deltaBlocks > 0 && borrowSpeed > 0) {
             uint borrowAmount = div_(AToken(aToken).totalBorrows(), marketBorrowIndex);
             uint atlantisAccrued = mul_(deltaBlocks, borrowSpeed);
             Double memory ratio = borrowAmount > 0 ? fraction(atlantisAccrued, borrowAmount) : Double({mantissa: 0});
-            Double memory index = add_(Double({mantissa: borrowState.index}), ratio);
-            atlantisBorrowState[aToken] = AtlantisMarketState({
-                index: safe224(index.mantissa, "new index exceeds 224 bits"),
-                block: safe32(blockNumber, "block number exceeds 32 bits")
-            });
+            borrowState.index = safe224(add_(Double({mantissa: borrowState.index}), ratio).mantissa, "new index exceeds 224 bits");
+            borrowState.block = blockNumber;
         } else if (deltaBlocks > 0) {
-            borrowState.block = safe32(blockNumber, "block number exceeds 32 bits");
+            borrowState.block = blockNumber;
         }
     }
 
@@ -1169,20 +1173,22 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
         }
 
         AtlantisMarketState storage supplyState = atlantisSupplyState[aToken];
-        Double memory supplyIndex = Double({mantissa: supplyState.index});
-        Double memory supplierIndex = Double({mantissa: atlantisSupplierIndex[aToken][supplier]});
-        atlantisSupplierIndex[aToken][supplier] = supplyIndex.mantissa;
 
-        if (supplierIndex.mantissa == 0 && supplyIndex.mantissa > 0) {
-            supplierIndex.mantissa = atlantisInitialIndex;
+        uint supplyIndex = supplyState.index;
+        uint supplierIndex = atlantisSupplierIndex[aToken][supplier];
+
+        atlantisSupplierIndex[aToken][supplier] = supplyIndex;
+
+        if (supplierIndex == 0 && supplyIndex >= atlantisInitialIndex) {
+            supplierIndex = atlantisInitialIndex;
         }
 
-        Double memory deltaIndex = sub_(supplyIndex, supplierIndex);
+        Double memory deltaIndex = Double({mantissa: sub_(supplyIndex, supplierIndex)});
         uint supplierTokens = AToken(aToken).balanceOf(supplier);
         uint supplierDelta = mul_(supplierTokens, deltaIndex);
         uint supplierAccrued = add_(atlantisAccrued[supplier], supplierDelta);
         atlantisAccrued[supplier] = supplierAccrued;
-        emit DistributedSupplierAtlantis(AToken(aToken), supplier, supplierDelta, supplyIndex.mantissa);
+        emit DistributedSupplierAtlantis(AToken(aToken), supplier, supplierDelta, supplyIndex);
     }
 
     /**
@@ -1197,18 +1203,23 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
         }
        
         AtlantisMarketState storage borrowState = atlantisBorrowState[aToken];
-        Double memory borrowIndex = Double({mantissa: borrowState.index});
-        Double memory borrowerIndex = Double({mantissa: atlantisBorrowerIndex[aToken][borrower]});
-        atlantisBorrowerIndex[aToken][borrower] = borrowIndex.mantissa;
 
-        if (borrowerIndex.mantissa > 0) {
-            Double memory deltaIndex = sub_(borrowIndex, borrowerIndex);
-            uint borrowerAmount = div_(AToken(aToken).borrowBalanceStored(borrower), marketBorrowIndex);
-            uint borrowerDelta = mul_(borrowerAmount, deltaIndex);
-            uint borrowerAccrued = add_(atlantisAccrued[borrower], borrowerDelta);
-            atlantisAccrued[borrower] = borrowerAccrued;
-            emit DistributedBorrowerAtlantis(AToken(aToken), borrower, borrowerDelta, borrowIndex.mantissa);
+        uint borrowIndex = borrowState.index;
+        uint borrowerIndex = atlantisBorrowerIndex[aToken][borrower];
+
+        atlantisBorrowerIndex[aToken][borrower] = borrowIndex;
+
+        if (borrowerIndex == 0 && borrowIndex >= atlantisInitialIndex) {
+            borrowerIndex = atlantisInitialIndex;
         }
+
+        Double memory deltaIndex = Double({mantissa: sub_(borrowIndex, borrowerIndex)});
+        uint borrowerAmount = div_(AToken(aToken).borrowBalanceStored(borrower), marketBorrowIndex);        
+        // Calculate strike accrued: aTokenAmount * accruedPerBorrowedUnit
+        uint borrowerDelta = mul_(borrowerAmount, deltaIndex);
+        uint borrowerAccrued = add_(atlantisAccrued[borrower], borrowerDelta);
+        atlantisAccrued[borrower] = borrowerAccrued;
+        emit DistributedBorrowerAtlantis(AToken(aToken), borrower, borrowerDelta, borrowIndex);
     }
 
     /**
@@ -1310,13 +1321,20 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
     }
 
     /**
-     * @notice Set Atlantis speed for a single market
-     * @param aToken The market whose Atlantis speed to update
-     * @param atlantisSpeed New Atlantis speed for market
+     * @notice Set COMP borrow and supply speeds for the specified markets.
+     * @param aTokens The market whose Atlantis speed to update
+     * @param supplySpeeds New supply-side Atlantis speed for the corresponding market
+     * @param borrowSpeeds New borrow-side Atlantis speed for the corresponding market
      */
-    function _setAtlantisSpeed(AToken aToken, uint atlantisSpeed) public {
+    function _setAtlantisSpeeds(AToken[] memory aTokens, uint[] memory supplySpeeds, uint[] memory borrowSpeeds) public {
         require(adminOrInitializing(), "only admin can set atlantis speed");
-        setAtlantisSpeedInternal(aToken, atlantisSpeed);
+
+        uint numTokens = aTokens.length;
+        require(numTokens == supplySpeeds.length && numTokens == borrowSpeeds.length, "Comptroller::_setAtlantisSpeeds invalid input");
+
+        for (uint i = 0; i < numTokens; ++i) {
+            setAtlantisSpeedInternal(aTokens[i], supplySpeeds[i], borrowSpeeds[i]);
+        }
     }
 
     /**

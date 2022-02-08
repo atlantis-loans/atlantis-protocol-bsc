@@ -308,6 +308,18 @@ async function setContributorAtlantisSpeed(world: World, from: string, comptroll
   return world;
 }
 
+async function setAtlantisSpeeds(world: World, from: string, comptroller: Comptroller, aTokens: AToken[], supplySpeeds: NumberV[], borrowSpeeds: NumberV[]): Promise<World> {
+  let invokation = await invoke(world, comptroller.methods._setAtlantisSpeeds(aTokens.map(c => c._address), supplySpeeds.map(speed => speed.encode()), borrowSpeeds.map(speed => speed.encode())), from, ComptrollerErrorReporter);
+
+  world = addAction(
+    world,
+    `Atlantis speed for markets [${aTokens.map(a => a._address)}] set to supplySpeeds=[${supplySpeeds.map(speed => speed.show())}, borrowSpeeds=[${borrowSpeeds.map(speed => speed.show())}]`,
+    invokation
+  );
+
+  return world;
+}
+
 async function printLiquidity(world: World, comptroller: Comptroller): Promise<World> {
   let enterEvents = await getPastEvents(world, comptroller, 'StdComptroller', 'MarketEntered');
   let addresses = enterEvents.map((event) => event.returnValues['account']);
@@ -736,12 +748,12 @@ export function comptrollerCommands() {
       (world, from, {comptroller}) => refreshAtlantisSpeeds(world, from, comptroller)
     ),
     new Command<{comptroller: Comptroller, holder: AddressV}>(`
-      #### ClaimAtl
+      #### ClaimAtlantis
 
-      * "Comptroller ClaimAtl <holder>" - Claims atlantis
-      * E.g. "Comptroller ClaimAtl Geoff
+      * "Comptroller ClaimAtlantis <holder>" - Claims atlantis
+      * E.g. "Comptroller ClaimAtlantis Geoff
       `,
-      "ClaimAtl",
+      "ClaimAtlantis",
       [
         new Arg("comptroller", getComptroller, {implicit: true}),
         new Arg("holder", getAddressV)
@@ -789,7 +801,7 @@ export function comptrollerCommands() {
       (world, from, {comptroller, rate}) => setAtlantisRate(world, from, comptroller, rate)
     ),
     new Command<{comptroller: Comptroller, aToken: AToken, speed: NumberV}>(`
-      #### SetAtlantisSpeed
+      #### SetAtlantisSpeed (deprecated)
       * "Comptroller SetAtlantisSpeed <aToken> <rate>" - Sets Atlantis speed for market
       * E.g. "Comptroller SetAtlantisSpeed aToken 1000
       `,
@@ -801,6 +813,22 @@ export function comptrollerCommands() {
       ],
       (world, from, {comptroller, aToken, speed}) => setAtlantisSpeed(world, from, comptroller, aToken, speed)
     ),
+
+    new Command<{comptroller: Comptroller, aTokens: AToken[], supplySpeeds: NumberV[], borrowSpeeds: NumberV[]}>(`
+      #### SetAtlantisSpeeds
+      * "Comptroller SetAtlantisSpeeds (<aToken> ...) (<supplySpeed> ...) (<borrowSpeed> ...)" - Sets Atlantis speeds for markets
+      * E.g. "Comptroller SetAtlantisSpeeds (aZRX aBAT) (1000 0) (1000 2000)
+      `,
+      "SetAtlantisSpeeds",
+      [
+        new Arg("comptroller", getComptroller, {implicit: true}),
+        new Arg("aTokens", getATokenV, {mapped: true}),
+        new Arg("supplySpeeds", getNumberV, {mapped: true}),
+        new Arg("borrowSpeeds", getNumberV, {mapped: true})
+      ],
+      (world, from, {comptroller, aTokens, supplySpeeds, borrowSpeeds}) => setAtlantisSpeeds(world, from, comptroller, aTokens, supplySpeeds, borrowSpeeds)
+    ),
+
     new Command<{comptroller: Comptroller, contributor: AddressV, speed: NumberV}>(`
       #### SetContributorAtlantisSpeed
       * "Comptroller SetContributorAtlantisSpeed <contributor> <rate>" - Sets Atlantis speed for contributor

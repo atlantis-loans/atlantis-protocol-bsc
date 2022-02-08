@@ -161,3 +161,11 @@ contract ComptrollerV5Storage is ComptrollerV4Storage {
      /// @notice The Atlantis vault info
     mapping(address => VaultInfo) public vaultInfo;
 }
+
+contract ComptrollerV6Storage is ComptrollerV5Storage {
+    // @notice The rate at which atlantis is distributed to the corresponding borrow market (per block)
+    mapping(address => uint) public atlantisBorrowSpeeds;
+
+    /// @notice The rate at which atlantis is distributed to the corresponding supply market (per block)
+    mapping(address => uint) public atlantisSupplySpeeds;
+}
