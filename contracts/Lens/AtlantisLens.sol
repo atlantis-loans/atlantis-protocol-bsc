@@ -43,7 +43,6 @@ contract AtlantisLens {
     }
 
      function getAtlantisSpeeds(ComptrollerLensInterface comptroller, AToken aToken) internal returns (uint, uint) {
-        // Is backwards compatible with comptrollers without the supply and borrow speeds
         uint atlantisSupplySpeed = 0;
         (bool atlantisSupplySpeedSuccess, bytes memory atlantisSupplySpeedReturnData) =
             address(comptroller).call(
