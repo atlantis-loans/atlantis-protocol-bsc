@@ -1104,7 +1104,7 @@ contract Comptroller is ComptrollerV6Storage, ComptrollerInterface, ComptrollerE
      */
     function setAtlantisSpeedInternal(AToken aToken, uint supplySpeed, uint borrowSpeed) internal {
         Market storage market = markets[address(aToken)];
-        require(market.isListed, "Atlantis market is not listed");
+        require(market.isListed, "atlantis market is not listed");
 
         if (atlantisSupplySpeeds[address(aToken)] != supplySpeed) {
             updateAtlantisSupplyIndex(address(aToken));

@@ -91,7 +91,7 @@ describe('Flywheel', () => {
     aREP = await makeAToken({comptroller, supportMarket: true, underlyingPrice: 2, interestRateModelOpts});
     aZRX = await makeAToken({comptroller, supportMarket: true, underlyingPrice: 3, interestRateModelOpts});
     aEVIL = await makeAToken({comptroller, supportMarket: false, underlyingPrice: 3, interestRateModelOpts});
-    aUSD = await makeSToken({comptroller, supportMarket: true, underlyingPrice: 1, collateralFactor: 0.5, interestRateModelOpts});
+    aUSD = await makeAToken({comptroller, supportMarket: true, underlyingPrice: 1, collateralFactor: 0.5, interestRateModelOpts});
   });
 
   describe('_grantAtlantis()', () => {
@@ -168,7 +168,7 @@ describe('Flywheel', () => {
       for (let mkt of [aLOW, aREP, aZRX]) {
         await send(comptroller, '_setAtlantisSpeeds', [[mkt._address], [etherExp(0.5)], [etherExp(0.5)]]);
       }
-      await send(comptroller, '_setAtlantisSpeeds', [[sREP._address], [0], [0]]);
+      await send(comptroller, '_setAtlantisSpeeds', [[aREP._address], [0], [0]]);
       expect(await call(comptroller, 'getAtlantisMarkets')).toEqual(
         [aLOW, aZRX].map((c) => c._address)
       );
@@ -583,7 +583,6 @@ describe('Flywheel', () => {
       expect(tx.gasUsed).toBeLessThan(500000);
       expect(supplySpeed).toEqualNumber(atlantisRate);
       expect(borrowSpeed).toEqualNumber(atlantisRate);
-      expect(speed).toEqualNumber(atlantisRate);
       expect(a2AccruedPre).toEqualNumber(0);
       expect(a2AccruedPost).toEqualNumber(0);
       expect(AtlantisBalancePre).toEqualNumber(0);
@@ -795,8 +794,8 @@ describe('Flywheel', () => {
     });
 
     it('should correctly get differing Atlantis supply and borrow speeds for 4 assets', async () => {
-      const aBAT = await makeSToken({ comptroller, supportMarket: true });
-      const aDAI = await makeSToken({ comptroller, supportMarket: true });
+      const aBAT = await makeAToken({ comptroller, supportMarket: true });
+      const aDAI = await makeAToken({ comptroller, supportMarket: true });
 
       const borrowSpeed1 = 5;
       const supplySpeed1 = 10;
@@ -895,11 +894,14 @@ describe('Flywheel', () => {
   describe('harnessAddAtlantisMarkets', () => {
     it('should correctly add a atlantis market if called by admin', async () => {
       const aBAT = await makeAToken({comptroller, supportMarket: true});
-      const tx1 = await send(comptroller, 'harnessAddAtlantisMarkets', [[aLOW._address, aREP._address, aZRX._address]]);
       const tx2 = await send(comptroller, 'harnessAddAtlantisMarkets', [[aBAT._address]]);
       const markets = await call(comptroller, 'getAtlantisMarkets');
       expect(markets).toEqual([aLOW, aREP, aZRX, aBAT].map((c) => c._address));
-      expect(tx2).toHaveLog('AtlantisSpeedUpdated', {
+      expect(tx2).toHaveLog('AtlantisBorrowSpeedUpdated', {
+        aToken: aBAT._address,
+        newSpeed: 1
+      });
+      expect(tx2).toHaveLog('AtlantisSupplySpeedUpdated', {
         aToken: aBAT._address,
         newSpeed: 1
       });
@@ -914,7 +916,7 @@ describe('Flywheel', () => {
       await send(comptroller, "setAtlantisSupplyState", [mkt, idx, bn0]);
       await send(comptroller, "setAtlantisBorrowState", [mkt, idx, bn0]);
       await send(comptroller, "setBlockNumber", [bn1]);
-      await send(comptroller, "_setAtlantisSpeed", [mkt, 0]);
+      await send(comptroller, "_setAtlantisSpeeds", [[mkt], [0], [0]]);
       await send(comptroller, "harnessAddAtlantisMarkets", [[mkt]]);
 
       const supplyState = await call(comptroller, 'atlantisSupplyState', [mkt]);
