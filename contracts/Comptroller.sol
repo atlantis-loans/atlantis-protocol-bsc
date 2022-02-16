@@ -1215,7 +1215,7 @@ contract Comptroller is ComptrollerV6Storage, ComptrollerInterface, ComptrollerE
 
         Double memory deltaIndex = Double({mantissa: sub_(borrowIndex, borrowerIndex)});
         uint borrowerAmount = div_(AToken(aToken).borrowBalanceStored(borrower), marketBorrowIndex);        
-        // Calculate strike accrued: aTokenAmount * accruedPerBorrowedUnit
+        // Calculate Atlantis accrued: aTokenAmount * accruedPerBorrowedUnit
         uint borrowerDelta = mul_(borrowerAmount, deltaIndex);
         uint borrowerAccrued = add_(atlantisAccrued[borrower], borrowerDelta);
         atlantisAccrued[borrower] = borrowerAccrued;
@@ -1321,7 +1321,7 @@ contract Comptroller is ComptrollerV6Storage, ComptrollerInterface, ComptrollerE
     }
 
     /**
-     * @notice Set COMP borrow and supply speeds for the specified markets.
+     * @notice Set ATLANTIS borrow and supply speeds for the specified markets.
      * @param aTokens The market whose Atlantis speed to update
      * @param supplySpeeds New supply-side Atlantis speed for the corresponding market
      * @param borrowSpeeds New borrow-side Atlantis speed for the corresponding market
