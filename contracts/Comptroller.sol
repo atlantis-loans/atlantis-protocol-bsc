@@ -1085,16 +1085,6 @@ contract Comptroller is ComptrollerV6Storage, ComptrollerInterface, ComptrollerE
     function _become(Unitroller unitroller) public {
         require(msg.sender == unitroller.admin(), "only unitroller admin can change brains");
         require(unitroller._acceptImplementation() == 0, "change not authorized");
-        
-        // TODO: Remove this post upgrade
-        Comptroller(address(unitroller))._upgradeSplitAtlantisRewards();
-    }
-
-    function _upgradeSplitAtlantisRewards() public {
-        require(msg.sender == comptrollerImplementation, "only brains can become itself");
-        for (uint i = 0; i < allMarkets.length; i ++) {
-            delete atlantisSpeeds[address(allMarkets[i])];
-        }
     }
 
     /**
