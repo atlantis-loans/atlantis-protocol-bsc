@@ -1,6 +1,7 @@
 const {
   address,
   encodeParameters,
+  etherExp,
 } = require('../Utils/Ethereum');
 const {
   makeComptroller,
@@ -50,7 +51,8 @@ describe('AtlantisLens', () => {
           underlyingAssetAddress: await call(aBep20, 'underlying', []),
           aTokenDecimals: "8",
           underlyingDecimals: "18",
-          atlantisSpeed: "0",
+          atlantisSupplySpeed: "0",
+          atlantisBorrowSpeed: "0",
           borrowCap: "0"
         }
       );
@@ -75,10 +77,40 @@ describe('AtlantisLens', () => {
         totalSupply: "0",
         underlyingAssetAddress: "0x0000000000000000000000000000000000000000",
         underlyingDecimals: "18",
-        atlantisSpeed: "0",
+        atlantisSupplySpeed: "0",
+        atlantisBorrowSpeed: "0",
         borrowCap: "0"
       });
     });
+  });
+
+  it('is correct for aBep20 with set atlantis speeds', async () => {
+    let comptroller = await makeComptroller();
+    let aBep20 = await makeAToken({comptroller, supportMarket: true});
+    await send(comptroller, '_setAtlantisSpeeds', [[aBep20._address], [etherExp(0.25)], [etherExp(0.75)]]);
+    expect(
+      cullTuple(await call(atlantisLens, 'aTokenMetadata', [aBep20._address]))
+    ).toEqual(
+      {
+        aToken: aBep20._address,
+        exchangeRateCurrent: "1000000000000000000",
+        supplyRatePerBlock: "0",
+        borrowRatePerBlock: "0",
+        reserveFactorMantissa: "0",
+        totalBorrows: "0",
+        totalReserves: "0",
+        totalSupply: "0",
+        totalCash: "0",
+        isListed: true,
+        collateralFactorMantissa: "0",
+        underlyingAssetAddress: await call(aBep20, 'underlying', []),
+        aTokenDecimals: "8",
+        underlyingDecimals: "18",
+        atlantisSupplySpeed: "250000000000000000",
+        atlantisBorrowSpeed: "750000000000000000",
+        borrowCap: "0",
+      }
+    );
   });
 
   describe('aTokenMetadataAll', () => {
@@ -103,7 +135,8 @@ describe('AtlantisLens', () => {
           underlyingAssetAddress: await call(aBep20, 'underlying', []),
           aTokenDecimals: "8",
           underlyingDecimals: "18",
-          atlantisSpeed: "0",
+          atlantisSupplySpeed: "0",
+          atlantisBorrowSpeed: "0",
           borrowCap: "0",
         },
         {
@@ -121,7 +154,8 @@ describe('AtlantisLens', () => {
           totalSupply: "0",
           underlyingAssetAddress: "0x0000000000000000000000000000000000000000",
           underlyingDecimals: "18",
-          atlantisSpeed: "0",
+          atlantisSupplySpeed: "0",
+          atlantisBorrowSpeed: "0",
           borrowCap: "0",
         }
       ]);

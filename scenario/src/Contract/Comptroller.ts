@@ -56,11 +56,14 @@ interface ComptrollerMethods {
   atlantisSupplierIndex(market: string, account: string): Callable<string>
   atlantisBorrowerIndex(market: string, account: string): Callable<string>
   atlantisSpeeds(string): Callable<string>
+  atlantisSupplySpeeds(string): Callable<string>
+  atlantisBorrowSpeeds(string): Callable<string>
   claimAtlantis(string): Sendable<void>
   updateContributorRewards(account: string): Sendable<void>
   _grantAtlantis(account: string, encodedNumber): Sendable<void>
   _setAtlantisRate(encodedNumber): Sendable<void>
-  _setAtlantisSpeed(aToken: string, encodedNumber): Sendable<void>
+  _setAtlantisSpeed(aTokens: string, encodedNumber): Sendable<void>
+  _setAtlantisSpeeds(aToken: string[], supplySpeeds: encodedNumber[], borrowSpeeds: encodedNumber[]): Sendable<void>
   _setContributorAtlantisSpeed(account: string, encodedNumber): Sendable<void>
   _setMarketBorrowCaps(aTokens:string[], borrowCaps:encodedNumber[]): Sendable<void>
   _setBorrowCapGuardian(string): Sendable<void>

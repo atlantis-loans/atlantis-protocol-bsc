@@ -16,30 +16,9 @@ interface ComptrollerLensInterface {
     function claimAtlantis(address) external;
     function atlantisAccrued(address) external view returns (uint);
     function atlantisSpeeds(address) external view returns (uint);
+    function atlantisSupplySpeeds(address) external view returns (uint);
+    function atlantisBorrowSpeeds(address) external view returns (uint);
     function borrowCaps(address) external view returns (uint);
-}
-
-interface GovernorBravoInterface {
-    struct Receipt {
-        bool hasVoted;
-        uint8 support;
-        uint96 votes;
-    }
-    struct Proposal {
-        uint id;
-        address proposer;
-        uint eta;
-        uint startBlock;
-        uint endBlock;
-        uint forVotes;
-        uint againstVotes;
-        uint abstainVotes;
-        bool canceled;
-        bool executed;
-    }
-    function getActions(uint proposalId) external view returns (address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas);
-    function proposals(uint proposalId) external view returns (Proposal memory);
-    function getReceipt(uint proposalId, address voter) external view returns (Receipt memory);
 }
 
 contract AtlantisLens {
@@ -58,8 +37,50 @@ contract AtlantisLens {
         address underlyingAssetAddress;
         uint aTokenDecimals;
         uint underlyingDecimals;
-        uint atlantisSpeed;
+        uint atlantisSupplySpeed;
+        uint atlantisBorrowSpeed;
         uint borrowCap;
+    }
+
+     function getAtlantisSpeeds(ComptrollerLensInterface comptroller, AToken aToken) internal returns (uint, uint) {
+        uint atlantisSupplySpeed = 0;
+        (bool atlantisSupplySpeedSuccess, bytes memory atlantisSupplySpeedReturnData) =
+            address(comptroller).call(
+                abi.encodePacked(
+                    comptroller.atlantisSupplySpeeds.selector,
+                    abi.encode(address(aToken))
+                )
+            );
+        if (atlantisSupplySpeedSuccess) {
+            atlantisSupplySpeed = abi.decode(atlantisSupplySpeedReturnData, (uint));
+        }
+
+        uint atlantisBorrowSpeed = 0;
+        (bool atlantisBorrowSpeedSuccess, bytes memory atlantisBorrowSpeedReturnData) =
+            address(comptroller).call(
+                abi.encodePacked(
+                    comptroller.atlantisBorrowSpeeds.selector,
+                    abi.encode(address(aToken))
+                )
+            );
+        if (atlantisBorrowSpeedSuccess) {
+            atlantisBorrowSpeed = abi.decode(atlantisBorrowSpeedReturnData, (uint));
+        }
+
+        // If the split atlantis speeds call doesn't work, try the  oldest non-spit version.
+        if (!atlantisSupplySpeedSuccess || !atlantisBorrowSpeedSuccess) {
+            (bool atlantisSpeedSuccess, bytes memory atlantisSpeedReturnData) =
+            address(comptroller).call(
+                abi.encodePacked(
+                    comptroller.atlantisSpeeds.selector,
+                    abi.encode(address(aToken))
+                )
+            );
+            if (atlantisSpeedSuccess) {
+                atlantisSupplySpeed = atlantisBorrowSpeed = abi.decode(atlantisSpeedReturnData, (uint));
+            }
+        }
+        return (atlantisSupplySpeed, atlantisBorrowSpeed);
     }
 
     function aTokenMetadata(AToken aToken) public returns (ATokenMetadata memory) {
@@ -78,18 +99,6 @@ contract AtlantisLens {
             underlyingDecimals = EIP20Interface(aBep20.underlying()).decimals();
         }
 
-        uint atlantisSpeed = 0;
-        (bool atlantisSpeedSuccess, bytes memory atlantisSpeedReturnData) =
-            address(comptroller).call(
-                abi.encodePacked(
-                    comptroller.atlantisSpeeds.selector,
-                    abi.encode(address(aToken))
-                )
-            );
-        if (atlantisSpeedSuccess) {
-            atlantisSpeed = abi.decode(atlantisSpeedReturnData, (uint));
-        }
-
         uint borrowCap = 0;
         (bool borrowCapSuccess, bytes memory borrowCapReturnData) =
             address(comptroller).call(
@@ -101,6 +110,9 @@ contract AtlantisLens {
         if (borrowCapSuccess) {
             borrowCap = abi.decode(borrowCapReturnData, (uint));
         }
+
+
+        (uint atlantisSupplySpeed, uint atlantisBorrowSpeed) = getAtlantisSpeeds(comptroller, aToken);
 
         return ATokenMetadata({
             aToken: address(aToken),
@@ -117,7 +129,8 @@ contract AtlantisLens {
             underlyingAssetAddress: underlyingAssetAddress,
             aTokenDecimals: aToken.decimals(),
             underlyingDecimals: underlyingDecimals,
-            atlantisSpeed: atlantisSpeed,
+            atlantisSupplySpeed: atlantisSupplySpeed,
+            atlantisBorrowSpeed: atlantisBorrowSpeed,
             borrowCap: borrowCap
         });
     }
@@ -239,28 +252,6 @@ contract AtlantisLens {
         return res;
     }
 
-    struct GovBravoReceipt {
-        uint proposalId;
-        bool hasVoted;
-        uint8 support;
-        uint96 votes;
-    }
-
-    function getGovBravoReceipts(GovernorBravoInterface governor, address voter, uint[] memory proposalIds) public view returns (GovBravoReceipt[] memory) {
-        uint proposalCount = proposalIds.length;
-        GovBravoReceipt[] memory res = new GovBravoReceipt[](proposalCount);
-        for (uint i = 0; i < proposalCount; i++) {
-            GovernorBravoInterface.Receipt memory receipt = governor.getReceipt(proposalIds[i], voter);
-            res[i] = GovBravoReceipt({
-                proposalId: proposalIds[i],
-                hasVoted: receipt.hasVoted,
-                support: receipt.support,
-                votes: receipt.votes
-            });
-        }
-        return res;
-    }
-
     struct GovProposal {
         uint proposalId;
         address proposer;
@@ -325,68 +316,6 @@ contract AtlantisLens {
                 executed: false
             });
             setProposal(res[i], governor, proposalIds[i]);
-        }
-        return res;
-    }
-
-    struct GovBravoProposal {
-        uint proposalId;
-        address proposer;
-        uint eta;
-        address[] targets;
-        uint[] values;
-        string[] signatures;
-        bytes[] calldatas;
-        uint startBlock;
-        uint endBlock;
-        uint forVotes;
-        uint againstVotes;
-        uint abstainVotes;
-        bool canceled;
-        bool executed;
-    }
-
-    function setBravoProposal(GovBravoProposal memory res, GovernorBravoInterface governor, uint proposalId) internal view {
-        GovernorBravoInterface.Proposal memory p = governor.proposals(proposalId);
-
-        res.proposalId = proposalId;
-        res.proposer = p.proposer;
-        res.eta = p.eta;
-        res.startBlock = p.startBlock;
-        res.endBlock = p.endBlock;
-        res.forVotes = p.forVotes;
-        res.againstVotes = p.againstVotes;
-        res.abstainVotes = p.abstainVotes;
-        res.canceled = p.canceled;
-        res.executed = p.executed;
-    }
-
-    function getGovBravoProposals(GovernorBravoInterface governor, uint[] calldata proposalIds) external view returns (GovBravoProposal[] memory) {
-        GovBravoProposal[] memory res = new GovBravoProposal[](proposalIds.length);
-        for (uint i = 0; i < proposalIds.length; i++) {
-            (
-                address[] memory targets,
-                uint[] memory values,
-                string[] memory signatures,
-                bytes[] memory calldatas
-            ) = governor.getActions(proposalIds[i]);
-            res[i] = GovBravoProposal({
-                proposalId: 0,
-                proposer: address(0),
-                eta: 0,
-                targets: targets,
-                values: values,
-                signatures: signatures,
-                calldatas: calldatas,
-                startBlock: 0,
-                endBlock: 0,
-                forVotes: 0,
-                againstVotes: 0,
-                abstainVotes: 0,
-                canceled: false,
-                executed: false
-            });
-            setBravoProposal(res[i], governor, proposalIds[i]);
         }
         return res;
     }

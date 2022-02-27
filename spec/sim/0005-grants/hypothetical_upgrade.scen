@@ -36,12 +36,12 @@ Assert Equal (Bep20 Atlantis TokenBalance (Address Tarun)) (10e6)
 
 -- Check contributor claim does not work without update
 AdvanceBlocks 997
-From Tarun (Comptroller ClaimAtl Tarun)
+From Tarun (Comptroller ClaimAtlantis Tarun)
 Assert Equal (Bep20 Atlantis TokenBalance (Address Tarun)) (10e6)
 
 -- Check contributor claim amount is added
 From Tarun (Comptroller UpdateContributorRewards Tarun)
-From Tarun (Comptroller ClaimAtl Tarun)
+From Tarun (Comptroller ClaimAtlantis Tarun)
 Assert Equal (Bep20 Atlantis TokenBalance (Address Tarun)) (10015000)
 
 
@@ -61,7 +61,7 @@ AdvanceBlocks 1000
 
 -- Check contributor claim amount is added
 From Tarun (Comptroller UpdateContributorRewards Tarun)
-From Tarun (Comptroller ClaimAtl Tarun)
+From Tarun (Comptroller ClaimAtlantis Tarun)
 
 -- Initial value          10015000 = 10000000 grant + (997+3)*15
 -- Second grant           20000000
@@ -87,7 +87,7 @@ AdvanceBlocks 10000
 
 -- Check no more Atlantis was allocated
 From Tarun (Comptroller UpdateContributorRewards Tarun)
-From Tarun (Comptroller ClaimAtl Tarun)
+From Tarun (Comptroller ClaimAtlantis Tarun)
 -- Initial value          30320130
 -- Third proposal mining  100000 = 20000*5
 -- Extra blocks           0 = 1000*0

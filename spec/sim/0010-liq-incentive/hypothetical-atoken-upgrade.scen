@@ -34,6 +34,6 @@ Governor GovernorBravo Proposal LastProposal Queue
 IncreaseTime 604910
 Governor GovernorBravo Proposal LastProposal Execute
 
-From Root (Comptroller ClaimAtl Root)
+From Root (Comptroller ClaimAtlantis Root)
 
 Print "Migration to new comptroller ok"
