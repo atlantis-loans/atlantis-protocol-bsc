@@ -155,7 +155,7 @@ contract XVSVaultStrategy is XVSVaultStrategyStorage, ReentrancyGuard {
 
         user.amountATL = user.amountATL.add(amount);
 
-        // Transfer ATL from user wallet to the vault
+        // Transfer ATL from user wallet to this vault
         IBEP20(atlantis).safeTransferFrom(user.userAddress, address(this), amount);
 
         emit DepositATL(user.userAddress, amount);
@@ -170,10 +170,6 @@ contract XVSVaultStrategy is XVSVaultStrategyStorage, ReentrancyGuard {
 
         uint256 _amountATL = user.amountATL;
         user.amountATL = 0;
-
-        // (uint256 amount, , ) = IXVSVault(xvsVault).getUserInfo(xvs, pid, user.contractAddress);
-        // require(amount == 0, "You first need to stop compounding and withdraw all XVS");
-        // require(user.amountATL <= IBEP20(atlantis).balanceOf(address(this)), "Not enough ATL balance");
 
         (uint256 newDepositPercentage, uint256 roundedMaxDepositPercentage, ) = this.calculateUserDepositAllowance(user.userAddress, 0);
         require(newDepositPercentage <= roundedMaxDepositPercentage, "Decrease your total XVS deposit below max deposit limit.");
