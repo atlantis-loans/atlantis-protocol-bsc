@@ -27,12 +27,16 @@
         "DOT": "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402",
         "aCAKE": "0xd7C38eb724a4610A9fB78F3f9F6C400577e30AC2",
         "CAKE": "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82",
+        "aXVS": "0x5c81c0f55A15Dbc97749A83c843044702768A2A2",
+        "XVS": "0xcF6BB5389c92Bdda8a3747Ddb454cB7a64626C63",
         "Timelock": "0xd72BAE6AD60a6f4f3d3045510907CCE94520b03d",
         "GovernorAlpha": "0x0Ed46f84ebF8aF56Eb29644F6a49d184aD771E11",
         "AtlantisPriceOracle": "0x08f53B683e1B87d952a0878ce763c1E6F2F5B0d6",
         "AtlantisChainLinkOracle": "0xC9B6D028c0BEeC6E50cEdbF18f2F28976Da402d0",
         "Base0bps_Slope1200bps_Jump2800bps_Kink80": "0xC2F02c119ACD716a55D55456df2f192C20235fBF",
-        "Base260bps_Slope1200bps_Jump3000bps_Kink80": "0xC303D3AEAC1D5a0e7fF0040400931650E299245F"
+        "Base260bps_Slope1200bps_Jump3000bps_Kink80": "0xC303D3AEAC1D5a0e7fF0040400931650E299245F",
+        "Base0bps_Slope1100bps_Jump1800bps_Kink85": "0xf12402C565AC6F1E1E95f8e10FBFE53b7844edE5",
+        "XVSVaultStrategy": "0xCB41d1A460b235013428f2E45B77A95883dBE10d"
        
     },
     "Blocks": {
@@ -58,7 +62,8 @@
         "GovernorAlpha": 0,
         "AtlantisPriceOracle": 11932423,
         "Base0bps_Slope1200bps_Jump2800bps_Kink80": 11932409,
-        "Base260bps_Slope1200bps_Jump3000bps_Kink80": 12170057
+        "Base260bps_Slope1200bps_Jump3000bps_Kink80": 12170057,
+        "XVSVaultStrategy": 16506860
     },
     "AtlantisLens": {
         "name": "AtlantisLens",
@@ -96,6 +101,11 @@
             "address": "0x4B10244a761e5894aAfd05E963D4Bde271b9c34d",
             "contract": "ABep20Delegate",
             "description": "Delegate ABep20Delegate"
+        },
+        "ATokenDelegateWithTransferImplementation": {
+            "address": "0x10Ad989013666140FF09cc219B4890746249BE33",
+            "contract": "ABep20Delegate",
+            "description": "Strategy vault liquidity transer implementation"
         }
     },
     "aTokens": {
@@ -207,6 +217,17 @@
             "initial_exchange_rate_mantissa": "20000000000000000",
             "admin": "0x",
             "underlying": "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82",
+            "contract": "ABep20Delegate"
+        },
+        "aXVS": {
+            "name": "Atlantis XVS Token",
+            "symbol": "aXVS",
+            "decimals": 8,
+            "address": "0x5c81c0f55A15Dbc97749A83c843044702768A2A2",
+            "initial_exchange_rate_mantissa": "20000000000000000",
+            "admin": "0x",
+            "underlying": "0xcF6BB5389c92Bdda8a3747Ddb454cB7a64626C63",
+            "implementation": "0x10Ad989013666140FF09cc219B4890746249BE33",
             "contract": "ABep20Delegate"
         }
     },
